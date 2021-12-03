@@ -1,0 +1,5 @@
+seed: 0
+algorithm: "test"
+log_path: "./logs/"
+defaults:
+  - rl_env: "prison"

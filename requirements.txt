@@ -1,0 +1,10 @@
+numpy
+tqdm
+hydra-core
+pre-commit
+black
+isort
+pytest
+ray[rllib]
+torch
+torchvision
