@@ -1,2 +1,1 @@
-num_agents: 4
-episode_length: 100
+num_floors: 4

@@ -1,27 +1,28 @@
-from typing import Dict
+
 
 import hydra
-from ray import tune
-from ray.rllib.agents.ppo import PPOTrainer
 
 
-class Runner(object):
-    def __init__(self, config: Dict) -> None:
-        pass
+from environement import Environment
+from runner import Runner
 
-    def run(self):
-        print("This is where stuff happens")
 
 
 def get_config():
     hydra.initialize(config_path="configs", job_name="run")
     cfg = hydra.compose(config_name="config")
-    return cfg
+    transform = hydra.utils.instantiate(cfg, _convert_="partial")
+    return transform
+
+
 
 
 def main():
     config = get_config()
+   # env_config = get_env_config()
     runner = Runner(config)
+    env = Environment()
+    env.registerenv()
     runner.run()
 
 
