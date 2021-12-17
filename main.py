@@ -19,10 +19,13 @@ def get_config():
 
 def main():
     config = get_config()
-   # env_config = get_env_config()
+
     runner = Runner(config)
-    env = Environment()
-    env.registerenv()
+    
+    environment = Environment()
+    environment.registerenv()
+    
+
     runner.run()
 
 

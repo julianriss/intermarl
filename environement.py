@@ -7,18 +7,23 @@ from typing import Dict
 
 
 class Environment(object):
-   
+    def __init__(self):
+        self.env = None
+
+    def env(self):
+        return self.env
 
     def env_creator(self):
-        env = prison_v3.env(num_floors=4)
+        self.env = prison_v3.env(num_floors=1, vector_observation=True)
 
-        env = ss.color_reduction_v0(env, mode='B')
-        env = ss.dtype_v0(env, 'float32')
-        env = ss.resize_v0(env, x_size=84, y_size=84)
-        env = ss.frame_stack_v1(env, 3)
-        env = ss.normalize_obs_v0(env, env_min=0, env_max=1)
-        return env
+        #self.env = ss.color_reduction_v0(self.env, mode='B')
+        #self.env = ss.dtype_v0(self.env, 'float32')
+        #self.env = ss.resize_v0(self.env, x_size=84, y_size=84)
+        #self.env = ss.frame_stack_v1(self.env, 3)
+        #self.env = ss.normalize_obs_v0(self.env, env_min=0, env_max=1)
+        pass
     
     def registerenv(self):
-        register_env("prison", lambda config: PettingZooEnv(self.env_creator()))
+        self.env_creator()
+        register_env("prison", lambda config: PettingZooEnv(self.env))
         pass
