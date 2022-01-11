@@ -1,12 +1,13 @@
 
 
 import hydra
+from critic import Critic
 
 
 from environement import Environment
 from runner import Runner
 
-
+from ray.rllib.models.torch.torch_modelv2 import TorchModelV2
 
 def get_config():
     hydra.initialize(config_path="configs", job_name="run")
@@ -18,13 +19,19 @@ def get_config():
 
 
 def main():
-    config = get_config()
+    configg = get_config()
 
-    runner = Runner(config)
     
     environment = Environment()
     environment.registerenv()
     
+
+
+    
+    
+
+    
+    runner = Runner(configg, environment)
 
     runner.run()
 

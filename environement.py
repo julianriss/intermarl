@@ -14,8 +14,8 @@ class Environment(object):
         return self.env
 
     def env_creator(self):
-        self.env = prison_v3.env(num_floors=1, vector_observation=True)
-
+        self.env = prison_v3.env(num_floors=2, vector_observation=True)
+       
         #self.env = ss.color_reduction_v0(self.env, mode='B')
         #self.env = ss.dtype_v0(self.env, 'float32')
         #self.env = ss.resize_v0(self.env, x_size=84, y_size=84)
