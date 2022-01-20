@@ -19,6 +19,9 @@ from functools import partial
 
 import time
 
+from numpy import asarray
+from numpy import save
+import mpu
 
 class MyCallback(DefaultCallbacks):
   
@@ -26,10 +29,13 @@ class MyCallback(DefaultCallbacks):
 
     def __init__(self, environment, legacy_callbacks_dict: Dict[str, callable] = None):
         self.critic = Critic(environment)
+        self.i = 0
         super().__init__(legacy_callbacks_dict=legacy_callbacks_dict)
 
 
     def on_learn_on_batch(self, *, policy, train_batch, result, **kwargs):
+        self.i += 1
+        self.train_batch = train_batch
         #print("observation: ", train_batch["obs"], "actions: ", train_batch["actions"], "rewards: ", train_batch["rewards"], "agentindex: ", train_batch["agent_index"])
         agentindex = train_batch["agent_index"]
         observations = train_batch["obs"]
@@ -37,7 +43,9 @@ class MyCallback(DefaultCallbacks):
         rewards = train_batch["rewards"]
         batchsize = len(agentindex)
         number_of_agents = len(set(agentindex))
-        print(number_of_agents)
+        #print(number_of_agents)
+        print(agentindex)
+        print("\n")
         #observations = np.split(observations, number_of_agents)
         #actions = np.split(actions, number_of_agents)
         #rewards = np.split(rewards, number_of_agents)
@@ -47,8 +55,8 @@ class MyCallback(DefaultCallbacks):
         #for i in range(batchsize):
             
          #   print("\n\n")
-        
-        self.critic.feedDQN(train_batch)
+        #mpu.io.write('ppo.pickle', train_batch)
+        #self.critic.feedDQN(train_batch)
         
         pass
 
@@ -58,18 +66,24 @@ class Runner(object):
         self.environement = environment
         pass
 
-    def test():
-        print("tsgvhbjnk")
+    
 
     
     def run(self):
-        strhhj = "tzujh"
         tune.run(self.config['algorithm'], checkpoint_freq=1, config={
             "framework": self.config['framework'],
             "env": self.config['env'],
-            #"rollout_fragment_length": 40,
-           #"train_batch_size": 800,
+            #"rollout_fragment_length": 32,
+            "sgd_minibatch_size": 32,
+            "train_batch_size":32,
+            #"prioritized_replay": False,
+            #"batch_mode": "complete_episodes",
             "callbacks": partial(MyCallback, self.environement),
+
+            "multiagent": {
+            #"replay_mode": "lockstep",
+             },
+            
            "num_cpus_per_worker":1
            
         })

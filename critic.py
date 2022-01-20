@@ -13,9 +13,12 @@ class Critic(object):
 
         self.os = environment.env.observation_space(environment.env.agents[0])
         self.acs = environment.env.action_space(environment.env.agents[0])
-        self.dqn = DQNTorchPolicy(self.os,  self.acs , {"num_workers": 1, "num_gpus": 0})
+        self.dqn = DQNTorchPolicy(self.os,  self.acs , {})
     
     def feedDQN(self, batch):
+        
+        #print(self.dqn.get_weights())
         self.dqn.learn_on_batch(batch)
+        print("learn on batch")
         pass
 
