@@ -1,4 +1,11 @@
+from numpy import float32
 from ray.rllib.agents.dqn.dqn_torch_policy import DQNTorchPolicy
+from ray.rllib.agents.dqn.dqn_torch_policy import ComputeTDErrorMixin
+import mpu
+from gym.spaces import MultiDiscrete, Discrete, Box
+
+
+
 
 
 class Critic(object):
@@ -10,15 +17,22 @@ class Critic(object):
 
         environment.env.reset()
 
+        #self.os = environment.env.observation_space(environment.env.agents[0])
+        self.os = Box(-300., 300., (1,), float32)
 
-        self.os = environment.env.observation_space(environment.env.agents[0])
-        self.acs = environment.env.action_space(environment.env.agents[0])
-        self.dqn = DQNTorchPolicy(self.os,  self.acs , {})
-    
-    def feedDQN(self, batch):
+        #self.acs = environment.get_env().action_space(environment.get_env().agents[0])
         
+        self.acs = Discrete(81)
+        self.dqn = DQNTorchPolicy(self.os, self.acs, {"num_gpus": 0,
+            "num_workers": 1})
+        pass 
+    def feedDQN(self, batch):
+        print("observations: ", batch["obs"])
+        print("actions:", batch["actions"])
+
         #print(self.dqn.get_weights())
-        self.dqn.learn_on_batch(batch)
-        print("learn on batch")
+        print(self.dqn.learn_on_batch(batch))
+        #mpu.io.write('learn_on_batch.pickle', self.dqn.learn_on_batch(batch))
+        #print(batch)
         pass
 
