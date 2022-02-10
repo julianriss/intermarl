@@ -40,7 +40,7 @@ class Critic(object):
         random_actions = np.random.randint(low=0, high=80, size=repeator)
         #repeated_batch['obs'] = random_obs
         #repeated_batch["new_obs"] = random_obs
-        repeated_batch["actions"] = random_actions
+        # repeated_batch["actions"] = random_actions
         #repeated_batch["dones"] = np.array([False for k in range(256)])
         #repeated_batch["rewards"] = np.array([0 for k in range(256)])
 
