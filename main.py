@@ -37,13 +37,13 @@ def main():
     # original_batches = mpu.io.read(path + 'original_batches.pickle')
     #ub = mpu.io.read(path + "ub.pickle")
 
+
     #learnonbatch = mpu.io.read(path + 'learn_on_batch.pickle')
     #critic = Critic(environment)
     #critic.feedDQN(new_batch_format)
 
-    qvals = mpu.io.read('/Users/julian/Desktop/qvals.pickle')
     
-    runner = Runner(config, environment)
+    runner = Runner(config, environment, num_agents=4)
     runner.run()
 
 
