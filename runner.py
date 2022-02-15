@@ -88,11 +88,12 @@ class MyCallback(DefaultCallbacks):
         #SampleBatch.__setitem__(postprocessed_batch, "obs", Discrete(350.0))
         #print(SampleBatch.CUR_OBS)
         #print(postprocessed_batch[SampleBatch.ACTIONS])
-        print("this is one original_batch")
-        print(original_batches)
-        print("this was one original batch")
+        #print("this is one original_batch")
+        #print(original_batches)
+        #print("this was one original batch")
         self.batch = np.append(self.batch, postprocessed_batch)
-        print(self.batch)
+        #print(self.batch)
+        
         if(agent_id == "prisoner_3"):
 
             o0 = self.batch[0][SampleBatch.CUR_OBS][0][0]
@@ -134,12 +135,12 @@ class MyCallback(DefaultCallbacks):
             SampleBatch.__setitem__(pb, SampleBatch.ACTIONS, np.array([translated_action], dtype=int32))
             
             # mpu.io.write("./logs/ub.pickle", pb)
-            mpu.io.write("./logs/postprocessed.pickle", postprocessed_batch)
+            #mpu.io.write("./logs/postprocessed.pickle", postprocessed_batch)
             # mpu.io.write("./logs/original_batches.pickle", original_batches)
-            mpu.io.write("./logs/new_batch_format.pickle", pb)
+            #mpu.io.write("./logs/new_batch_format.pickle", pb)
 
             #Übergabe des neuen batches an Critic
-            #self.critic.feedDQN(pb)
+            self.critic.feedDQN(pb)
 
 
             self.batch = np.array([])
