@@ -46,7 +46,6 @@ class Critic(object):
         print("actions: ", batch[SampleBatch.ACTIONS] )
         print("reward:", batch[SampleBatch.REWARDS])
         print("Q-Values:",  mpu.io.read(dir + "qvals.pickle"))
-
-       
+        print("\n")
         pass
 
