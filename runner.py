@@ -35,6 +35,12 @@ from gym.spaces import MultiDiscrete, Discrete, Box
 import copy
 
 
+def discretizeactions(input, base):
+    stringinput = ''.join(map(str, input))
+    return int(stringinput, base)
+
+
+
 
 
 
@@ -64,51 +70,12 @@ class MyCallback(DefaultCallbacks):
         super().__init__(legacy_callbacks_dict=legacy_callbacks_dict)
 
 
-    #def on_learn_on_batch(self, *, policy, train_batch, result, **kwargs):
-   #     self.i += 1
-   #     self.train_batch = train_batch
-        #print("observation: ", train_batch["obs"], "actions: ", train_batch["actions"], "rewards: ", train_batch["rewards"], "agentindex: ", train_batch["agent_index"])
-   #     agentindex = train_batch["agent_index"]
-   #     observations = train_batch["obs"]
-   #     actions = train_batch["actions"]
-   #     rewards = train_batch["rewards"]
-   #     batchsize = len(agentindex)
-   #     number_of_agents = len(set(agentindex))
-        #print(number_of_agents)
-   #     print(agentindex)
-   #     print("\n")
-        #observations = np.split(observations, number_of_agents)
-        #actions = np.split(actions, number_of_agents)
-        #rewards = np.split(rewards, number_of_agents)
-        
-        #agents = np.empty(4, 0)
-
-        #for i in range(batchsize):
-            
-         #   print("\n\n")
-        #mpu.io.write('ppo.pickle', train_batch)
-        #self.critic.feedDQN(train_batch)
-        
-        #print("train_batch")
-        #print(train_batch)
-   #     pass
+    
 
     def on_postprocess_trajectory(self, *, worker, episode, agent_id, policy_id, policies, postprocessed_batch, original_batches, **kwargs):
-        #print("before: ")
-        #print(postprocessed_batch["obs"])
-        #print("after:")
-        #SampleBatch.__setitem__(postprocessed_batch, "obs", Discrete(350.0))
-        #print(SampleBatch.CUR_OBS)
-        #print(postprocessed_batch[SampleBatch.ACTIONS])
-        #print("this is one original_batch")
-        #print(original_batches)
-        #print("this was one original batch")
+        
         self.batch = np.append(self.batch, postprocessed_batch)
-        #print(self.batch)
-
-        
-            
-        
+    
         if(agent_id == "prisoner_" + str(self.num_agents-1)):
         
             observations = np.array([])
@@ -126,7 +93,7 @@ class MyCallback(DefaultCallbacks):
            
             #Preprozessor zur Prüfung der Gültigkeit der Daten
             state_encoder = ModelCatalog.get_preprocessor_for_space(Box(-300.0, 300.0, (4,), dtype=np.float32))
-            action_encoder = ModelCatalog.get_preprocessor_for_space(MultiDiscrete([3,3,3,3]))
+            action_encoder = ModelCatalog.get_preprocessor_for_space(Discrete(81))
             
            
             #Erzeugung von validen Array mit Observations/Actions aller Agenten
@@ -134,13 +101,13 @@ class MyCallback(DefaultCallbacks):
             combined_next_obs = state_encoder.transform(observations_next)
             
 
-            combined_actions = action_encoder.transform(actions)
+            combined_actions = action_encoder.transform(discretizeactions(actions, 3))
             #print(combined_actions)
             
             #zusammengefasste Observations und Actions werden in kopierten postprocessed_batch geschrieben
             SampleBatch.__setitem__(pb, SampleBatch.CUR_OBS, combined_obs[np.newaxis, :])
             SampleBatch.__setitem__(pb, SampleBatch.NEXT_OBS, combined_next_obs[np.newaxis, :])
-            SampleBatch.__setitem__(pb, SampleBatch.ACTIONS, combined_actions)
+            SampleBatch.__setitem__(pb, SampleBatch.ACTIONS, combined_actions[np.newaxis, :])
 
 
             rewardbatches = []
@@ -151,7 +118,6 @@ class MyCallback(DefaultCallbacks):
 
             for i in range(0, self.num_agents):
                 self.criticsarray[i].feedDQN(rewardbatches[i], i)
-
             
 
             self.batch = np.array([])
