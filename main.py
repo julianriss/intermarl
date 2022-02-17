@@ -43,7 +43,7 @@ def main():
     #critic.feedDQN(new_batch_format)
 
     
-    runner = Runner(config, environment, num_agents=4)
+    runner = Runner(config, num_agents=4)
     runner.run()
 
 

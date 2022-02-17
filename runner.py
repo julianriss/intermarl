@@ -52,9 +52,7 @@ class MyCallback(DefaultCallbacks):
   
   
 
-    def __init__(self, environment, num_agents, legacy_callbacks_dict: Dict[str, callable] = None):
-        self.environemnt = environment
-        self.critic = Critic(environment)
+    def __init__(self, num_agents, legacy_callbacks_dict: Dict[str, callable] = None):
         self.batch_list = []
         self.batch = np.array([])
         self.i = None
@@ -64,7 +62,7 @@ class MyCallback(DefaultCallbacks):
         self.criticsarray = []
 
         for i in range(0, num_agents):
-            critic = Critic(environment)
+            critic = Critic()
             self.criticsarray.append(critic)
 
         super().__init__(legacy_callbacks_dict=legacy_callbacks_dict)
@@ -128,9 +126,8 @@ class MyCallback(DefaultCallbacks):
         pass
 
 class Runner(object):
-    def __init__(self, config: Dict, environment, num_agents) -> None:
+    def __init__(self, config: Dict, num_agents) -> None:
         self.config = config
-        self.environement = environment
         self.num_agents = num_agents
         pass
 
@@ -146,7 +143,7 @@ class Runner(object):
             "train_batch_size":32,
             #"prioritized_replay": False,
             #"batch_mode": "complete_episodes",
-            "callbacks": partial(MyCallback, self.environement, self.num_agents),
+            "callbacks": partial(MyCallback, self.num_agents),
             "num_gpus": 0,
             "num_workers": 1
             #"multiagent": {
