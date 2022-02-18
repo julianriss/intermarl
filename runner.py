@@ -59,7 +59,7 @@ class MyCallback(DefaultCallbacks):
         self.batch_list = []
         self.batch = np.array([])
         self.concatenatedbatch = []
-        self.batchsize = 256
+        self.batchsize = 81
         self.batchcounter = 0
         self.i = None
         self.e = None
@@ -123,14 +123,12 @@ class MyCallback(DefaultCallbacks):
                 self.concatenatedbatch[i] = SampleBatch.concat(self.concatenatedbatch[i], rewardbatches[i])
                 #print(self.concatenatedbatch)
 
-            if(self.batchcounter == 256):
-                self.concatenatedbatch = []
-            #for i in range(0, self.num_agents):
-            #    self.criticsarray[i].feedDQN(rewardbatches[i], i)
+           
+           
             
             if getBatchSize(self.concatenatedbatch[0]) == self.batchsize:
                 for i in range(0, self.num_agents):
-                    self.criticsarray[i].feedDQN(rewardbatches[i], i)
+                    self.criticsarray[i].feedDQN(self.concatenatedbatch[i], i)
                 self.concatenatedbatch = []
             self.batch = np.array([])
 

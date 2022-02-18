@@ -47,6 +47,7 @@ class Critic(object):
         return q_tp1
 
     def feedDQN(self, batch, agentnumber):
+        print(batch)
         self.dqn.learn_on_batch(batch)
 
        
