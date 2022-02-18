@@ -2,48 +2,6 @@ from ntpath import join
 import numpy as np
 from typing import List, Tuple
 import torch
-import networkx as nx
-from tqdm import tqdm
-
-
-def build_response_graph(action_space: Tuple[int]) -> nx.DiGraph:
-    response_graph = nx.DiGraph()
-    max_flat_index = calc_maximimum_flat_index(action_space)
-    response_graph.add_nodes_from([node for node in range(max_flat_index)])
-    print("Building the response graph! This step is costly, so be patient.")
-    for node in tqdm(range(max_flat_index)):
-        neighbors = get_neighbors_of_node(node, action_space)
-        for neighbor in neighbors:
-            response_graph.add_edge(node, neighbor)
-    return response_graph
-
-
-def calc_maximimum_flat_index(array_shape: Tuple[int]) -> int:
-    return np.prod(array_shape)
-
-
-def get_neighbors_of_node(node: int, action_space: Tuple[int]) -> List[int]:
-    """Enumerates all neighbors of a given node in the action-graph.
-    Another action is a neighbor iff only one agent deviates in its action.
-    Args:
-        node: a flat index of a joint-action
-    Returns:
-        neighbors: a list of indices that represent single deviating joint-actions from the given node
-    """
-    base_actions = node_to_actions(node, action_space)
-    neighbors = []
-    for deviating_agent, base_action in enumerate(base_actions):
-        for action in range(action_space[deviating_agent]):
-            if action != base_action:
-                deviating_actions = replace_single_action_in_actions(
-                    base_actions, action, deviating_agent
-                )
-                neighbors.append(actions_to_nodes(deviating_actions, action_space))
-    return neighbors
-
-
-def node_to_actions(node: int, array_shape: Tuple[int]) -> Tuple[int]:
-    return np.unravel_index(node, array_shape)
 
 
 def nodes_to_actions(nodes: np.ndarray, array_shape: Tuple[int]) -> np.ndarray:
