@@ -1,61 +1,113 @@
+from ntpath import join
 import numpy as np
-from typing import List
+from typing import List, Tuple
+import torch
+import networkx as nx
+from tqdm import tqdm
 
 
-def int_in_base_to_dec_int(base_array: np.ndarray, base:int) -> np.ndarray:
-    """Takes an array of shape (y, x) or (x,), where the integers along dimension x
-    represent entries of numbers to base base. If base=2, the sequence of integers
-    gives a binary number. This method returns the corresponding integer in decimal.
+def build_response_graph(action_space: Tuple[int]) -> nx.DiGraph:
+    response_graph = nx.DiGraph()
+    max_flat_index = calc_maximimum_flat_index(action_space)
+    response_graph.add_nodes_from([node for node in range(max_flat_index)])
+    print("Building the response graph! This step is costly, so be patient.")
+    for node in tqdm(range(max_flat_index)):
+        neighbors = get_neighbors_of_node(node, action_space)
+        for neighbor in neighbors:
+            response_graph.add_edge(node, neighbor)
+    return response_graph
+
+
+def calc_maximimum_flat_index(array_shape: Tuple[int]) -> int:
+    return np.prod(array_shape)
+
+
+def get_neighbors_of_node(node: int, action_space: Tuple[int]) -> List[int]:
+    """Enumerates all neighbors of a given node in the action-graph.
+    Another action is a neighbor iff only one agent deviates in its action.
+    Args:
+        node: a flat index of a joint-action
+    Returns:
+        neighbors: a list of indices that represent single deviating joint-actions from the given node
+    """
+    base_actions = node_to_actions(node, action_space)
+    neighbors = []
+    for deviating_agent, base_action in enumerate(base_actions):
+        for action in range(action_space[deviating_agent]):
+            if action != base_action:
+                deviating_actions = replace_single_action_in_actions(
+                    base_actions, action, deviating_agent
+                )
+                neighbors.append(actions_to_nodes(deviating_actions, action_space))
+    return neighbors
+
+
+def node_to_actions(node: int, array_shape: Tuple[int]) -> Tuple[int]:
+    return np.unravel_index(node, array_shape)
+
+
+def nodes_to_actions(nodes: np.ndarray, array_shape: Tuple[int]) -> np.ndarray:
+    """This is the array version of node_to_actions.
+    Args:
+        nodes (np.ndarray): shape=(x, )
+        array_shape (Tuple[int]): the multi-index to ravel into
+
+    Returns:
+        np.ndarray: shape(x, len(array_shape))
+    """
+    return np.array(np.unravel_index(nodes, array_shape)).T
+
+
+def actions_to_nodes(actions: np.ndarray, array_shape: Tuple[int]) -> np.ndarray:
+    """Array of shape (batch_size, num_agents) is turned into a raveled multi-index by array_shape shape (y,)
+    Args:
+        actions (np.ndarray): shape (batch_size, num_agents)
+        array_shape (Tuple[int]): shape(batch_size, )
+
+    Returns:
+        np.ndarray: shape(batch_size, )
+    """
+    return np.ravel_multi_index(actions.T, array_shape)
+
+
+def replace_single_action_in_actions(
+    base_actions: Tuple[int], deviating_action: int, deviating_agent: int
+) -> Tuple[int]:
+    changed_actions = list(base_actions)
+    changed_actions[deviating_agent] = deviating_action
+    return changed_actions
+
+
+def get_neighbors_to_actions(batched_actions: np.ndarray, action_space: Tuple[int]) -> List[List[int]]:
+    """Computes all single deviating neighbors to a given array of joint-actions.
 
     Args:
-        base_array (np.ndarray): dtype=int, shape=(1, x) or (x,)
-        base (int): base to convert from
+        batched_actions (np.ndarray): shape(batch_size, num_agents)
+        action_space (Tuple[int]): shape(num_agents) where the values are the action-space sizes
 
     Returns:
-        np.ndarray: shape(y, )
+        List[List[int]]: For every given action, it contains a list of length num_agents, 
+        where each there contains a list of num_neighbors (=action_space_size for this agent)
     """
-    if len(base_array.shape) == 1:
-        base_array = base_array[np.newaxis, :]
-    assert np.max(base_array) < base, "The array is not in the given number system!"
-    assert np.min(base_array) > -1, "The number array can only contain non-zero values!"
-    base_multiples_array = calc_base_multiples_array(base_array.shape[0], base, base_array.shape[1])
-    return np.sum(base_array * base_multiples_array, axis=1)
+    return [get_all_neighbors_to_joint_action(action_space, actions) for actions in batched_actions]
 
+def get_all_neighbors_to_joint_action(action_space, actions):
+    return [get_neighbors_to_deviating_agent(action_space, actions, deviating_agent) for deviating_agent in range(actions.shape[0])]
 
-def calc_base_multiples_by_index(base: int, index_length: int) -> np.ndarray:
-    """A number given in the specified base with the index length determines
-    which multiples of the index is needed to return to decimal system.
-    Example: base=3, index_length=4 returns array([[27, 9, 3, 1]])
-
-    Returns:
-        np.ndarray: shape = (1, index_length)
-    """
-    return np.array([base ** k for k in range(index_length-1, -1, -1)])[np.newaxis, :]
-
-
-def calc_base_multiples_array(amount_of_num: int, base: int, index_length: int) -> np.ndarray:
-    base_multiples = calc_base_multiples_by_index(base, index_length)
-    return np.repeat(base_multiples, amount_of_num, axis=0)
-
-
-def int_in_dec_to_base_in_array(dec_array: np.ndarray, base: int, repr_length:int) -> np.ndarray:
-    if len(dec_array.shape) == 1:
-        dec_array = dec_array[np.newaxis, :]
-    base_repr_value = np.vectorize(np.base_repr)
-    base_string_array = base_repr_value(dec_array, base=base)
-    base_string_array = np.char.zfill(base_string_array, repr_length)
-    return np.array([string_to_int_list(string[0]) for string in base_string_array.T])
-
-def string_to_int_list(string_of_ints: str) -> List[int]:
-    return [int(c) for c in string_of_ints]
+def get_neighbors_to_deviating_agent(action_space, actions, deviating_agent):
+    return [replace_single_action_in_actions(
+                        actions, deviating_action, deviating_agent
+                    ) for deviating_action in range(action_space[deviating_agent])]
 
 
 def main():
-    joint_action = np.array([[0, 0, 2, 1], [1, 0, 1, 2]])
-    translated_array = int_in_base_to_dec_int(joint_action, base=3)
-    print(translated_array)
-    dec_int_array = int_in_dec_to_base_in_array(translated_array, base=3, repr_length=4)
-    print(dec_int_array)
+    action_space = (3, 3, 3, 3)
+    nodes_to_actions(np.array([1, 2]), action_space)
+    actions_to_nodes(np.array([[1, 2, 0, 1], [0, 1, 2, 1]]), action_space)
+    neighbors = get_neighbors_to_actions(np.array([[1, 2, 0, 1], [0, 1, 2, 1]]), action_space)
+
+
+    q_values = torch.rand(4, 81)
 
 
 if __name__ == "__main__":
