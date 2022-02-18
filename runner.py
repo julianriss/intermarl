@@ -40,6 +40,9 @@ def discretizeactions(input, base):
     return int(stringinput, base)
 
 
+def getBatchSize(batch):
+    return int(str(batch).split("SampleBatch(", 1)[1].split(":", 1)[0])
+
 
 
 
@@ -55,11 +58,15 @@ class MyCallback(DefaultCallbacks):
     def __init__(self, num_agents, legacy_callbacks_dict: Dict[str, callable] = None):
         self.batch_list = []
         self.batch = np.array([])
+        self.concatenatedbatch = []
+        self.batchsize = 256
+        self.batchcounter = 0
         self.i = None
         self.e = None
         self.z = 0
         self.num_agents = num_agents
         self.criticsarray = []
+
 
         for i in range(0, num_agents):
             critic = Critic()
@@ -71,7 +78,6 @@ class MyCallback(DefaultCallbacks):
     
 
     def on_postprocess_trajectory(self, *, worker, episode, agent_id, policy_id, policies, postprocessed_batch, original_batches, **kwargs):
-        
         self.batch = np.append(self.batch, postprocessed_batch)
     
         if(agent_id == "prisoner_" + str(self.num_agents-1)):
@@ -112,12 +118,20 @@ class MyCallback(DefaultCallbacks):
             for i in range(0,self.num_agents):
                 rewardbatches.append(pb)
                 SampleBatch.__setitem__(rewardbatches[i], SampleBatch.REWARDS, self.batch[i][SampleBatch.REWARDS])
+                if len(self.concatenatedbatch) < 4:
+                    self.concatenatedbatch.append(rewardbatches[i])
+                self.concatenatedbatch[i] = SampleBatch.concat(self.concatenatedbatch[i], rewardbatches[i])
+                #print(self.concatenatedbatch)
 
-
-            for i in range(0, self.num_agents):
-                self.criticsarray[i].feedDQN(rewardbatches[i], i)
+            if(self.batchcounter == 256):
+                self.concatenatedbatch = []
+            #for i in range(0, self.num_agents):
+            #    self.criticsarray[i].feedDQN(rewardbatches[i], i)
             
-
+            if getBatchSize(self.concatenatedbatch[0]) == self.batchsize:
+                for i in range(0, self.num_agents):
+                    self.criticsarray[i].feedDQN(rewardbatches[i], i)
+                self.concatenatedbatch = []
             self.batch = np.array([])
 
        
@@ -140,7 +154,7 @@ class Runner(object):
             "env": self.config['env'],
             "rollout_fragment_length": 1,
             #"sgd_minibatch_size": 32,
-            "train_batch_size":32,
+            "train_batch_size":256,
             #"prioritized_replay": False,
             #"batch_mode": "complete_episodes",
             "callbacks": partial(MyCallback, self.num_agents),
