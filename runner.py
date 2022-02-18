@@ -118,6 +118,10 @@ class MyCallback(DefaultCallbacks):
             for i in range(0,self.num_agents):
                 rewardbatches.append(pb)
                 SampleBatch.__setitem__(rewardbatches[i], SampleBatch.REWARDS, self.batch[i][SampleBatch.REWARDS])
+
+                #verarbeitete Samples werden verkettet und in concatenatedbatch geschrieben. Bei vier agenten hat
+                # concatbatch dann die größe vier und an jeder Position einen Batch in der größe der vorher definierten
+                # batch size
                 if len(self.concatenatedbatch) < 4:
                     self.concatenatedbatch.append(rewardbatches[i])
                 self.concatenatedbatch[i] = SampleBatch.concat(self.concatenatedbatch[i], rewardbatches[i])
