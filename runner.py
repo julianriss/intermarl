@@ -35,7 +35,7 @@ from gym.spaces import MultiDiscrete, Discrete, Box
 import copy
 
 
-def discretizeactions(input, base):
+def discretizeactions(input, base):  # TODO: This one is deprecated, switch to actions_to_nodes from array_utils
     stringinput = ''.join(map(str, input))
     return int(stringinput, base)
 
@@ -44,22 +44,13 @@ def getBatchSize(batch):
     return int(str(batch).split("SampleBatch(", 1)[1].split(":", 1)[0])
 
 
-
-
-
-
-
-
-
 class MyCallback(DefaultCallbacks):
   
-  
-
     def __init__(self, num_agents, legacy_callbacks_dict: Dict[str, callable] = None):
         self.batch_list = []
         self.batch = np.array([])
         self.concatenatedbatch = []
-        self.batchsize = 81
+        self.batchsize = 81  # TODO: Why is this needed? Makes no sense
         self.batchcounter = 0
         self.i = None
         self.e = None
@@ -74,39 +65,32 @@ class MyCallback(DefaultCallbacks):
 
         super().__init__(legacy_callbacks_dict=legacy_callbacks_dict)
 
-
-    
-
     def on_postprocess_trajectory(self, *, worker, episode, agent_id, policy_id, policies, postprocessed_batch, original_batches, **kwargs):
         self.batch = np.append(self.batch, postprocessed_batch)
     
-        if(agent_id == "prisoner_" + str(self.num_agents-1)):
+        if(agent_id == "prisoner_" + str(self.num_agents-1)):  # TODO: this is only done for the last agent, generalize this!
         
-            observations = np.array([])
+            observations = np.array([])  # TODO: Should be made dynamic, and should be stored where the batches are needed. Not needed in the callback class but rather in the critic, maybe even write a new class that handles data.
             observations_next = np.array([])
             actions = np.array([], dtype=int)
 
-            for i in range(0,4):
+            for i in range(0,4):  # TODO: Stuff like this should be in an own method
                 observations = np.append(observations, self.batch[i][SampleBatch.CUR_OBS][0][0])
                 observations_next = np.append(observations_next, self.batch[i][SampleBatch.NEXT_OBS][0][0])
                 actions = np.append(actions, self.batch[i][SampleBatch.ACTIONS][0])
            
             pb = copy.deepcopy(postprocessed_batch)
             
-
-           
+           # TODO: Stuff like this should be in an own method
             #Preprozessor zur Prüfung der Gültigkeit der Daten
             state_encoder = ModelCatalog.get_preprocessor_for_space(Box(-300.0, 300.0, (4,), dtype=np.float32))
             action_encoder = ModelCatalog.get_preprocessor_for_space(Discrete(81))
-            
            
             #Erzeugung von validen Array mit Observations/Actions aller Agenten
             combined_obs = state_encoder.transform(observations)
             combined_next_obs = state_encoder.transform(observations_next)
-            
 
             combined_actions = action_encoder.transform(discretizeactions(actions, 3))
-            #print(combined_actions)
             
             #zusammengefasste Observations und Actions werden in kopierten postprocessed_batch geschrieben
             SampleBatch.__setitem__(pb, SampleBatch.CUR_OBS, combined_obs[np.newaxis, :])
@@ -115,6 +99,7 @@ class MyCallback(DefaultCallbacks):
 
 
             rewardbatches = []
+            # TODO: Stuff like this should be in an own method
             for i in range(0,self.num_agents):
                 rewardbatches.append(pb)
                 SampleBatch.__setitem__(rewardbatches[i], SampleBatch.REWARDS, self.batch[i][SampleBatch.REWARDS])
@@ -125,20 +110,16 @@ class MyCallback(DefaultCallbacks):
                 if len(self.concatenatedbatch) < 4:
                     self.concatenatedbatch.append(rewardbatches[i])
                 self.concatenatedbatch[i] = SampleBatch.concat(self.concatenatedbatch[i], rewardbatches[i])
-                #print(self.concatenatedbatch)
-
            
-           
-            
+           # TODO: Stuff like this should be in an own method
             if getBatchSize(self.concatenatedbatch[0]) == self.batchsize:
                 for i in range(0, self.num_agents):
                     self.criticsarray[i].feedDQN(self.concatenatedbatch[i], i)
+                    impact_samples = self.criticsarray[i].get_impact_samples_for_batch(
+                        self.concatenatedbatch[i][SampleBatch.OBS], self.concatenatedbatch[i]["actions"]) # This returns the impact samples! Can be used to train the tim estimation. I would say, you simply track the moving average. TBD.
+                    print("Impact Samples i", impact_samples)
                 self.concatenatedbatch = []
             self.batch = np.array([])
-
-       
-
-       
         pass
 
 class Runner(object):

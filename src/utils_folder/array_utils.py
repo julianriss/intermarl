@@ -48,22 +48,6 @@ def get_neighbors_to_actions(batched_actions: np.ndarray, action_space: Tuple[in
     return neighbors
 
 
-def get_impact_samples_for_batch(obs: torch.Tensor, actions: torch.Tensor, action_space: Tuple[int]) -> torch.Tensor:
-    """Computes the impact samples for a given batch.
-    Args:
-        obs (torch.Tensor): batch of observations (shape=(#samples, #features))
-        actions (torch.Tensor): batch of joint actions
-        action_space (Tuple[int]): action space (shape=(#agents, ))
-
-    Returns:
-        torch.Tensor: shape=(#samples, #agents)
-    """
-    q_values = torch.arange(2*3*4*5*6).view(2,3*4*5*6)  # TODO: Calculate q-values
-    decoded_actions = decode_discrete_actions(actions, action_space, ret_as_joint_actions=True)
-    neighbors = get_neighbors_to_actions(decoded_actions, action_space)
-    return get_impact_samples_from_q_values(q_values, neighbors)
-
-
 def get_impact_samples_from_q_values(q_values: torch.Tensor, neighbors: List[np.ndarray]) -> torch.Tensor:
     impact_samples = torch.empty(q_values.shape[0], len(neighbors))
     for agent, deviating_actions_for_agent in enumerate(neighbors):
@@ -74,7 +58,7 @@ def get_impact_samples_from_q_values(q_values: torch.Tensor, neighbors: List[np.
 
 
 def decode_discrete_actions(encoded_actions: torch.Tensor, action_space: Tuple[int], ret_as_joint_actions:bool=False) -> np.ndarray:
-    """Inverts the transform method from Discrete gym space encoder.
+    """Inverts the transform method from Discrete gym space encoder. Assumes a one-hot encoding of discrete action space.
     Args:
         encoded_actions (torch.Tensor): tensor of shape=(#samples, size action_space)
         action_space (Tuple[int]): tuple of indiviual action space sizes shape=(#agents, )
@@ -101,9 +85,6 @@ def main():
     action_encoder = ModelCatalog.get_preprocessor_for_space(Discrete(3*4*5*6))
     encoded_actions = torch.tensor([action_encoder.transform(i) for i in [34,  110]])
     decoded_actions = decode_discrete_actions(encoded_actions, action_space, True)
-
-    impact_samples = get_impact_samples_for_batch(None, encoded_actions,
-     action_space)
     
     
 

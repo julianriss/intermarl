@@ -1,16 +1,13 @@
-from ast import Mult
-from cgi import test
 from numpy import float32
 from ray.rllib.agents.dqn.dqn_torch_policy import DQNTorchPolicy
-from ray.rllib.agents.dqn.dqn_torch_policy import ComputeTDErrorMixin
-from ray.rllib.agents.dqn.dqn_torch_policy import QLoss
 from ray.rllib.agents.dqn.dqn_torch_policy import compute_q_values
 from ray.rllib.policy.sample_batch import SampleBatch
-import mpu
-from gym.spaces import MultiDiscrete, Discrete, Box
+from gym.spaces import Discrete, Box
+import torch
+import src.utils_folder.array_utils as ar_ut
+from typing import Tuple
 import numpy as np
-import ray
-from types import MethodType
+
 
 dir = "/Users/julian/Desktop/"
 
@@ -25,13 +22,14 @@ class Critic(object):
     def __init__(self):
 
         # environment.env.reset()
+        self.action_space = (3, 3, 3, 3)  # TODO: make this dynamic from the specific environment!
 
         #self.os = environment.env.observation_space(environment.env.agents[0])
         self.os = Box(-300., 300., (4,), float32)
 
         #self.acs = environment.get_env().action_space(environment.get_env().agents[0])
         
-        self.acs = Discrete(81)
+        self.acs = Discrete(np.prod(self.action_space))
         self.dqn = DQNTorchPolicy(self.os, self.acs, {"num_gpus": 0,
             "num_workers": 1,
             })
@@ -59,4 +57,18 @@ class Critic(object):
         print("Q-Values:",  self.get_q_values(batch[SampleBatch.NEXT_OBS]))
         print("\n")
         pass
+
+
+    def get_impact_samples_for_batch(self, obs: torch.Tensor, actions: torch.Tensor) -> torch.Tensor:
+        """Computes the impact samples for a given batch.
+        Args:
+            obs (torch.Tensor): batch of observations (shape=(#samples, #features))
+            actions (torch.Tensor): batch of one-hot encoded actions
+        Returns:
+            torch.Tensor: shape=(#samples, #agents)
+        """
+        q_values = self.get_q_values(obs)
+        decoded_actions = ar_ut.decode_discrete_actions(actions, self.action_space, ret_as_joint_actions=True)
+        neighbors = ar_ut.get_neighbors_to_actions(decoded_actions, self.action_space)
+        return ar_ut.get_impact_samples_from_q_values(q_values, neighbors)
 
