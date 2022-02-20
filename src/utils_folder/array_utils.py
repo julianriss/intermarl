@@ -28,41 +28,32 @@ def actions_to_nodes(actions: np.ndarray, array_shape: Tuple[int]) -> np.ndarray
     return np.ravel_multi_index(actions.T, array_shape)
 
 
-def replace_single_action_in_actions(
-    base_actions: Tuple[int], deviating_action: int, deviating_agent: int
-) -> Tuple[int]:
-    changed_actions = list(base_actions)
-    changed_actions[deviating_agent] = deviating_action
-    return changed_actions
-
-
-def get_neighbors_to_actions(batched_actions: np.ndarray, action_space: Tuple[int]) -> List[List[int]]:
+def get_neighbors_to_actions(batched_actions: np.ndarray, action_space: Tuple[int]) -> List[np.ndarray]:
     """Computes all single deviating neighbors to a given array of joint-actions.
 
     Args:
         batched_actions (np.ndarray): shape(batch_size, num_agents)
         action_space (Tuple[int]): shape(num_agents) where the values are the action-space sizes
-
     Returns:
-        List[List[int]]: For every given action, it contains a list of length num_agents, 
-        where each there contains a list of num_neighbors (=action_space_size for this agent)
+        List[np.ndarray]: returns a list of arrays #agents[array.shape=(#samples, #action_space(agent))]
     """
-    return [get_all_neighbors_to_joint_action(action_space, actions) for actions in batched_actions]
-
-def get_all_neighbors_to_joint_action(action_space, actions):
-    return [get_neighbors_to_deviating_agent(action_space, actions, deviating_agent) for deviating_agent in range(actions.shape[0])]
-
-def get_neighbors_to_deviating_agent(action_space, actions, deviating_agent):
-    return [replace_single_action_in_actions(
-                        actions, deviating_action, deviating_agent
-                    ) for deviating_action in range(action_space[deviating_agent])]
+    neighbors = []
+    for deviating_agent in range(len(action_space)):
+        neighbors_to_deviating_agent = np.empty((batched_actions.shape[0], action_space[deviating_agent]), dtype=int)
+        for deviating_action in range(action_space[deviating_agent]):
+            copied_actions = batched_actions.copy()
+            copied_actions[:, deviating_agent] = deviating_action
+            neighbors_to_deviating_agent[:, deviating_action] = actions_to_nodes(copied_actions, action_space)
+        neighbors.append(neighbors_to_deviating_agent)
+    return neighbors
 
 
 def main():
-    action_space = (3, 3, 3, 3)
+    action_space = (3, 5, 7, 11)
     nodes_to_actions(np.array([1, 2]), action_space)
     actions_to_nodes(np.array([[1, 2, 0, 1], [0, 1, 2, 1]]), action_space)
-    neighbors = get_neighbors_to_actions(np.array([[1, 2, 0, 1], [0, 1, 2, 1]]), action_space)
+    neighbors = get_neighbors_to_actions(np.array([[1, 2, 0, 1], [0, 1, 2, 1]]),
+     action_space)
 
 
     q_values = torch.rand(4, 81)
