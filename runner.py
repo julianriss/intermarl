@@ -46,7 +46,7 @@ def getBatchSize(batch):
 
 class MyCallback(DefaultCallbacks):
   
-    def __init__(self, num_agents, legacy_callbacks_dict: Dict[str, callable] = None):
+    def __init__(self, config: Dict, legacy_callbacks_dict: Dict[str, callable] = None):
         self.batch_list = []
         self.batch = np.array([])
         self.concatenatedbatch = []
@@ -55,15 +55,15 @@ class MyCallback(DefaultCallbacks):
         self.i = None
         self.e = None
         self.z = 0
-        self.num_agents = num_agents
-        self.criticsarray = []
-
-
-        for i in range(0, num_agents):
-            critic = Critic()
-            self.criticsarray.append(critic)
+        self.config = config
+        self.env_config = config["rl_env"]
+        self.num_agents = self.env_config["num_agents"]
+        self.criticsarray = self._init_critics()
 
         super().__init__(legacy_callbacks_dict=legacy_callbacks_dict)
+    
+    def _init_critics(self) -> List[Critic]:
+        return [Critic(self.config, i) for i in range(self.num_agents)]
 
     def on_postprocess_trajectory(self, *, worker, episode, agent_id, policy_id, policies, postprocessed_batch, original_batches, **kwargs):
         self.batch = np.append(self.batch, postprocessed_batch)
@@ -114,7 +114,7 @@ class MyCallback(DefaultCallbacks):
            # TODO: Stuff like this should be in an own method
             if getBatchSize(self.concatenatedbatch[0]) == self.batchsize:
                 for i in range(0, self.num_agents):
-                    self.criticsarray[i].feedDQN(self.concatenatedbatch[i], i)
+                    self.criticsarray[i].train_critic(self.concatenatedbatch[i])
                     impact_samples = self.criticsarray[i].get_impact_samples_for_batch(
                         self.concatenatedbatch[i][SampleBatch.OBS], self.concatenatedbatch[i]["actions"]) # This returns the impact samples! Can be used to train the tim estimation. I would say, you simply track the moving average. TBD.
                     print("Impact Samples i", impact_samples)
@@ -123,24 +123,21 @@ class MyCallback(DefaultCallbacks):
         pass
 
 class Runner(object):
-    def __init__(self, config: Dict, num_agents) -> None:
+    def __init__(self, config: Dict) -> None:
         self.config = config
-        self.num_agents = num_agents
-        pass
+        self.env_config = config["rl_env"]
+        self.num_agents = self.env_config["num_agents"]
 
-    
-
-    
     def run(self):
-        tune.run(self.config['algorithm'], checkpoint_freq=1, config={
+        tune.run(self.config['algorithm']['name'], checkpoint_freq=1, config={
             "framework": self.config['framework'],
-            "env": self.config['env'],
+            "env": self.env_config['name'],
             "rollout_fragment_length": 1,
             #"sgd_minibatch_size": 32,
-            "train_batch_size":256,
+            "train_batch_size":self.config['algorithm']['train_batch_size'],
             #"prioritized_replay": False,
             #"batch_mode": "complete_episodes",
-            "callbacks": partial(MyCallback, self.num_agents),
+            "callbacks": partial(MyCallback, self.config),
             "num_gpus": 0,
             "num_workers": 1
             #"multiagent": {
@@ -150,4 +147,3 @@ class Runner(object):
            #"num_cpus_per_worker":1
            
         })
-        print("This is where stuff happens")

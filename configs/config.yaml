@@ -1,3 +1,4 @@
-env: "prison_v3"
 framework: "torch"
-algorithm: "DQN"
+defaults:
+  - rl_env: prison
+  - algorithm: dqn

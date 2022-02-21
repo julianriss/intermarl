@@ -1,13 +1,10 @@
 
 
 import hydra
-from critic import Critic
-import mpu
 
 from environement import Environment
 from runner import Runner
-from numpy import load
-from ray.rllib.models.torch.torch_modelv2 import TorchModelV2
+import src.utils_folder.config_utils as cf_ut
 
 def get_config():
     hydra.initialize(config_path="configs", job_name="run")
@@ -42,8 +39,9 @@ def main():
     #critic = Critic(environment)
     #critic.feedDQN(new_batch_format)
 
+    cf_ut.enrich_config_file(config)
     
-    runner = Runner(config, num_agents=4)
+    runner = Runner(config)
     runner.run()
 
 
