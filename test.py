@@ -1,5 +1,3 @@
 import numpy as np
 
-
-
-print(transformactions([2,2,2,2], 3))
+print(transformactions([2, 2, 2, 2], 3))
