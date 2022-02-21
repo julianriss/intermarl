@@ -1,34 +1,21 @@
 import copy
-import functools
-import os
-import time
 from functools import partial
 from logging import config, critical
 from os import ctermid
 from pdb import post_mortem
 from random import randrange
 from time import sleep
-from typing import Dict, Iterable, List
+from typing import Dict, List
 
-import gym
-import hydra
-import mpu
 import numpy as np
-import torch
-from gym.spaces import Box, Discrete, MultiDiscrete
-from numpy import asarray, dtype, float32, float64, int32, save
 from ray import tune
-from ray.rllib import TorchPolicy
 from ray.rllib.agents.callbacks import DefaultCallbacks
-from ray.rllib.agents.ppo import PPOTrainer
-from ray.rllib.agents.qmix import QMixTrainer
 from ray.rllib.models import ModelCatalog
 from ray.rllib.policy.sample_batch import SampleBatch
-from ray.tune import Callback
-from ray.tune.ray_trial_executor import RayTrialExecutor
-from ray.tune.trial import Trial
 
+import src.utils_folder.array_utils as ar_ut
 from critic import Critic
+from src.data_loader.replay_buffer import ReplayBuffer
 
 
 def discretizeactions(
@@ -55,12 +42,17 @@ class MyCallback(DefaultCallbacks):
         self.config = config
         self.env_config = config["rl_env"]
         self.num_agents = self.env_config["num_agents"]
+        self.action_space_sizes = self.env_config["action_space_sizes"]
         self.criticsarray = self._init_critics()
+        self.replay_buffer = self._init_replay_buffer()
 
         super().__init__(legacy_callbacks_dict=legacy_callbacks_dict)
 
     def _init_critics(self) -> List[Critic]:
         return [Critic(self.config, i) for i in range(self.num_agents)]
+
+    def _init_replay_buffer(self) -> ReplayBuffer:
+        return ReplayBuffer(self.config)
 
     def on_postprocess_trajectory(
         self,
@@ -74,6 +66,18 @@ class MyCallback(DefaultCallbacks):
         original_batches,
         **kwargs
     ):
+        # TODO: The following section, where you handle the data creation needs to be revised. What you need here:
+        """
+        1. Collect the data that you get for one postprocessed batch from all agents
+        2. Send this collected data into the replay buffer
+        3. The replay buffer takes the data and hands it over to the DataHandler
+        4. The DataHandler reshuffles the data in the correct way (as you have done below)
+        5. The DataHandler hands the restructered data back to the replay buffer
+        6. The replay buffer stores the data into the buffer (or batch)
+        7. Inside this method here, every batch_size number of steps, sample from the replay buffer
+        8. Take this sample and train the critics
+        9. Use the sample to train the Impact Measurement Approximation
+        """
         self.batch = np.append(self.batch, postprocessed_batch)
 
         if agent_id == "prisoner_" + str(
@@ -100,15 +104,19 @@ class MyCallback(DefaultCallbacks):
             # TODO: Stuff like this should be in an own method
             # Preprozessor zur Prüfung der Gültigkeit der Daten
             state_encoder = ModelCatalog.get_preprocessor_for_space(
-                Box(-300.0, 300.0, (4,), dtype=np.float32)
+                self.config["rl_env"]["observation_space"]
             )
-            action_encoder = ModelCatalog.get_preprocessor_for_space(Discrete(81))
+            action_encoder = ModelCatalog.get_preprocessor_for_space(
+                self.config["rl_env"]["action_space"]
+            )
 
             # Erzeugung von validen Array mit Observations/Actions aller Agenten
             combined_obs = state_encoder.transform(observations)
             combined_next_obs = state_encoder.transform(observations_next)
 
-            combined_actions = action_encoder.transform(discretizeactions(actions, 3))
+            combined_actions = action_encoder.transform(
+                ar_ut.actions_to_nodes(actions, self.action_space_sizes)
+            )
 
             # zusammengefasste Observations und Actions werden in kopierten postprocessed_batch geschrieben
             SampleBatch.__setitem__(
@@ -151,7 +159,6 @@ class MyCallback(DefaultCallbacks):
                     print("Impact Samples i", impact_samples)
                 self.concatenatedbatch = []
             self.batch = np.array([])
-        pass
 
 
 class Runner(object):

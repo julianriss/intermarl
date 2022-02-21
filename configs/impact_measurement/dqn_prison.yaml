@@ -1,0 +1,4 @@
+name: "dqn_prison"
+buffer_size: 10000
+sampling_size: 256
+
