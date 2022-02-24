@@ -3,3 +3,4 @@ defaults:
   - rl_env: prison
   - algorithm: dqn
   - impact_measurement: dqn_prison
+  - _self_

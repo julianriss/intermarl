@@ -14,7 +14,7 @@ from ray.rllib.models import ModelCatalog
 from ray.rllib.policy.sample_batch import SampleBatch
 
 import src.utils_folder.array_utils as ar_ut
-from critic import Critic
+from impact_approximator import ImpactApproximator
 from src.data_loader.replay_buffer import ReplayBuffer
 
 
@@ -48,8 +48,8 @@ class MyCallback(DefaultCallbacks):
 
         super().__init__(legacy_callbacks_dict=legacy_callbacks_dict)
 
-    def _init_critics(self) -> List[Critic]:
-        return [Critic(self.config, i) for i in range(self.num_agents)]
+    def _init_critics(self) -> List[ImpactApproximator]:
+        return [ImpactApproximator(self.config, i) for i in range(self.num_agents)]
 
     def _init_replay_buffer(self) -> ReplayBuffer:
         return ReplayBuffer(self.config)
@@ -152,11 +152,12 @@ class MyCallback(DefaultCallbacks):
             if getBatchSize(self.concatenatedbatch[0]) == self.batchsize:
                 for i in range(0, self.num_agents):
                     self.criticsarray[i].train_critic(self.concatenatedbatch[i])
-                    impact_samples = self.criticsarray[i].get_impact_samples_for_batch(
+                    impact_samples = self.criticsarray[i].update_impact_measurement(
                         self.concatenatedbatch[i][SampleBatch.OBS],
                         self.concatenatedbatch[i]["actions"],
-                    )  # This returns the impact samples! Can be used to train the tim estimation. I would say, you simply track the moving average. TBD.
+                    )
                     print("Impact Samples i", impact_samples)
+                    print("Impact_samples shape", impact_samples.shape)
                 self.concatenatedbatch = []
             self.batch = np.array([])
 
