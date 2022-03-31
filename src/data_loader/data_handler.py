@@ -1,11 +1,17 @@
 from typing import Dict, Tuple
 
+import numpy as np
+from ray.rllib.policy.sample_batch import SampleBatch
+import copy
+from ray.rllib.models import ModelCatalog
+import src.utils_folder.array_utils as ar_ut
+
 
 class BaseDataHandler(object):
     def __init__(self, config: Dict) -> None:
         self.config = config
 
-    def transform_postprocessed_batch(self, experience: Tuple):
+    def transform_postprocessed_batch(self, collected_batch):
         """Takes the data from all agents and transforms them into the right format to train with.
         This includes:
         - concatenating the observations from each agent
@@ -27,3 +33,63 @@ class PrisonDataHandler(BaseDataHandler):
 
     def __init__(self, config: Dict) -> None:
         super().__init__(config)
+
+    def transform_postprocessed_batch(self, data, pb_structure, action_space_size):
+
+        observations = np.array([])
+        observations_next = np.array([])
+        actions = np.array([], dtype=int)
+
+        for i in range(0, 4):  # TODO: Stuff like this should be in an own method
+            observations = np.append(
+                observations, data[i][SampleBatch.CUR_OBS][0][0]
+            )
+            observations_next = np.append(
+                observations_next, data[i][SampleBatch.NEXT_OBS][0][0]
+            )
+            actions = np.append(
+                actions, data[i][SampleBatch.ACTIONS][0])
+
+        pb = copy.deepcopy(pb_structure)
+
+        state_encoder = ModelCatalog.get_preprocessor_for_space(
+            self.config["rl_env"]["observation_space"]
+        )
+        action_encoder = ModelCatalog.get_preprocessor_for_space(
+            self.config["rl_env"]["action_space"]
+        )
+
+        # Erzeugung von validen Array mit Observations/Actions aller Agenten
+        combined_obs = state_encoder.transform(observations)
+        combined_next_obs = state_encoder.transform(observations_next)
+
+        combined_actions = action_encoder.transform(
+            ar_ut.actions_to_nodes(actions, action_space_size)
+        )
+
+        # zusammengefasste Observations und Actions werden in kopierten postprocessed_batch geschrieben
+        SampleBatch.__setitem__(
+            pb, SampleBatch.CUR_OBS, combined_obs[np.newaxis, :]
+        )
+        SampleBatch.__setitem__(
+            pb, SampleBatch.NEXT_OBS, combined_next_obs[np.newaxis, :]
+        )
+        SampleBatch.__setitem__(
+            pb, SampleBatch.ACTIONS, combined_actions[np.newaxis, :]
+        )
+
+
+        rewardbatches = []
+        # TODO: Stuff like this should be in an own method
+        for i in range(0, 4):
+            rewardbatches.append(pb)
+            SampleBatch.__setitem__(
+                rewardbatches[i],
+                SampleBatch.REWARDS,
+                data[i][SampleBatch.REWARDS],
+            )
+        
+        
+
+
+        return rewardbatches

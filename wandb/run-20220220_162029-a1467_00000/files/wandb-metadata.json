@@ -1,0 +1,22 @@
+{
+    "os": "macOS-11.5.2-x86_64-i386-64bit",
+    "python": "3.9.9",
+    "heartbeatAt": "2022-02-20T15:20:30.396101",
+    "startedAt": "2022-02-20T15:20:29.798934",
+    "docker": null,
+    "cpu_count": 8,
+    "cuda": null,
+    "args": [],
+    "state": "running",
+    "program": "/Users/julian/Documents/intermarl/main.py",
+    "codePath": "main.py",
+    "git": {
+        "remote": "https://github.com/julianriss/intermarl.git",
+        "commit": "2b1bef745e9ff34cec1f136da9a0d0d1ff255214"
+    },
+    "email": "ge36hip@mytum.de",
+    "root": "/Users/julian/Documents/intermarl",
+    "host": "Julians-MacBook-Pro.local",
+    "username": "julian",
+    "executable": "/Users/julian/Documents/intermarl/rlenv/bin/python"
+}

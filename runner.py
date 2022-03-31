@@ -7,6 +7,9 @@ from random import randrange
 from time import sleep
 from typing import Dict, List
 
+from ray.tune.logger import DEFAULT_LOGGERS
+from ray.tune.integration.wandb import WandbLoggerCallback
+
 import numpy as np
 from ray import tune
 from ray.rllib.agents.callbacks import DefaultCallbacks
@@ -16,6 +19,8 @@ from ray.rllib.policy.sample_batch import SampleBatch
 import src.utils_folder.array_utils as ar_ut
 from impact_approximator import ImpactApproximator
 from src.data_loader.replay_buffer import ReplayBuffer
+
+import mpu
 
 
 def discretizeactions(
@@ -30,11 +35,12 @@ def getBatchSize(batch):
 
 
 class MyCallback(DefaultCallbacks):
+
     def __init__(self, config: Dict, legacy_callbacks_dict: Dict[str, callable] = None):
         self.batch_list = []
         self.batch = np.array([])
-        self.concatenatedbatch = []
-        self.batchsize = 81  # TODO: Why is this needed? Makes no sense
+        self.collected_postprocessed_batch = np.array([])
+        self.concatenatedbatch = []  
         self.batchcounter = 0
         self.i = None
         self.e = None
@@ -45,6 +51,8 @@ class MyCallback(DefaultCallbacks):
         self.action_space_sizes = self.env_config["action_space_sizes"]
         self.criticsarray = self._init_critics()
         self.replay_buffer = self._init_replay_buffer()
+        self.count = 0
+        self.average = [0,0,0,0]
 
         super().__init__(legacy_callbacks_dict=legacy_callbacks_dict)
 
@@ -54,112 +62,36 @@ class MyCallback(DefaultCallbacks):
     def _init_replay_buffer(self) -> ReplayBuffer:
         return ReplayBuffer(self.config)
 
-    def on_postprocess_trajectory(
-        self,
-        *,
-        worker,
-        episode,
-        agent_id,
-        policy_id,
-        policies,
-        postprocessed_batch,
-        original_batches,
-        **kwargs
-    ):
-        # TODO: The following section, where you handle the data creation needs to be revised. What you need here:
-        """
-        1. Collect the data that you get for one postprocessed batch from all agents
-        2. Send this collected data into the replay buffer
-        3. The replay buffer takes the data and hands it over to the DataHandler
-        4. The DataHandler reshuffles the data in the correct way (as you have done below)
-        5. The DataHandler hands the restructered data back to the replay buffer
-        6. The replay buffer stores the data into the buffer (or batch)
-        7. Inside this method here, every batch_size number of steps, sample from the replay buffer
-        8. Take this sample and train the critics
-        9. Use the sample to train the Impact Measurement Approximation
-        """
-        self.batch = np.append(self.batch, postprocessed_batch)
+    def on_postprocess_trajectory(self, *, worker, episode, agent_id, policy_id, policies, postprocessed_batch, original_batches, **kwargs):
+        self.count += 1
 
-        if agent_id == "prisoner_" + str(
-            self.num_agents - 1
-        ):  # TODO: this is only done for the last agent, generalize this!
+        if(postprocessed_batch.__len__() == 1):
+            self.collected_postprocessed_batch = np.append(self.collected_postprocessed_batch, postprocessed_batch)
 
-            observations = np.array(
-                []
-            )  # TODO: Should be made dynamic, and should be stored where the batches are needed. Not needed in the callback class but rather in the critic, maybe even write a new class that handles data.
-            observations_next = np.array([])
-            actions = np.array([], dtype=int)
+            #Wenn self.collected_postprocessed_batch batches von allen 4 agenten enthält, wird er an den replay buffer übergeben und dort weiter verarbeitet  
+            if agent_id == "prisoner_" + str(self.num_agents - 1):
+                self.replay_buffer.add_data_to_buffer(self.collected_postprocessed_batch, postprocessed_batch, self.action_space_sizes)
+                self.collected_postprocessed_batch = np.array([])
 
-            for i in range(0, 4):  # TODO: Stuff like this should be in an own method
-                observations = np.append(
-                    observations, self.batch[i][SampleBatch.CUR_OBS][0][0]
-                )
-                observations_next = np.append(
-                    observations_next, self.batch[i][SampleBatch.NEXT_OBS][0][0]
-                )
-                actions = np.append(actions, self.batch[i][SampleBatch.ACTIONS][0])
 
-            pb = copy.deepcopy(postprocessed_batch)
+            if self.replay_buffer.push_count > 1:
+                for i in range(0, 4):
 
-            # TODO: Stuff like this should be in an own method
-            # Preprozessor zur Prüfung der Gültigkeit der Daten
-            state_encoder = ModelCatalog.get_preprocessor_for_space(
-                self.config["rl_env"]["observation_space"]
-            )
-            action_encoder = ModelCatalog.get_preprocessor_for_space(
-                self.config["rl_env"]["action_space"]
-            )
+                    #Sample wird aus Replaybuffer für agenten i geholt
+                    sample = self.replay_buffer.sample_batch()[0][i]
 
-            # Erzeugung von validen Array mit Observations/Actions aller Agenten
-            combined_obs = state_encoder.transform(observations)
-            combined_next_obs = state_encoder.transform(observations_next)
+                    #mpu.io.write("logs/sample" + str(i) + ".pickle", sample)
 
-            combined_actions = action_encoder.transform(
-                ar_ut.actions_to_nodes(actions, self.action_space_sizes)
-            )
-
-            # zusammengefasste Observations und Actions werden in kopierten postprocessed_batch geschrieben
-            SampleBatch.__setitem__(
-                pb, SampleBatch.CUR_OBS, combined_obs[np.newaxis, :]
-            )
-            SampleBatch.__setitem__(
-                pb, SampleBatch.NEXT_OBS, combined_next_obs[np.newaxis, :]
-            )
-            SampleBatch.__setitem__(
-                pb, SampleBatch.ACTIONS, combined_actions[np.newaxis, :]
-            )
-
-            rewardbatches = []
-            # TODO: Stuff like this should be in an own method
-            for i in range(0, self.num_agents):
-                rewardbatches.append(pb)
-                SampleBatch.__setitem__(
-                    rewardbatches[i],
-                    SampleBatch.REWARDS,
-                    self.batch[i][SampleBatch.REWARDS],
-                )
-
-                # verarbeitete Samples werden verkettet und in concatenatedbatch geschrieben. Bei vier agenten hat
-                # concatbatch dann die größe vier und an jeder Position einen Batch in der größe der vorher definierten
-                # batch size
-                if len(self.concatenatedbatch) < 4:
-                    self.concatenatedbatch.append(rewardbatches[i])
-                self.concatenatedbatch[i] = SampleBatch.concat(
-                    self.concatenatedbatch[i], rewardbatches[i]
-                )
-
-            # TODO: Stuff like this should be in an own method
-            if getBatchSize(self.concatenatedbatch[0]) == self.batchsize:
-                for i in range(0, self.num_agents):
-                    self.criticsarray[i].train_critic(self.concatenatedbatch[i])
-                    impact_samples = self.criticsarray[i].update_impact_measurement(
-                        self.concatenatedbatch[i][SampleBatch.OBS],
-                        self.concatenatedbatch[i]["actions"],
+                    #critic für Agenten i mit sample für Agenten i trainieren
+                    self.criticsarray[i].train_critic(sample)
+                    print("Agent ", i, " :", self.criticsarray[i].get_tim_approximation(), " Sum: ",  self.criticsarray[i].get_tim_approximation().sum())
+                    
+                
+                    self.criticsarray[i].update_impact_measurement(
+                        sample[SampleBatch.OBS],
+                        sample[SampleBatch.ACTIONS],
                     )
-                    print("Impact Samples i", impact_samples)
-                    print("Impact_samples shape", impact_samples.shape)
-                self.concatenatedbatch = []
-            self.batch = np.array([])
+        return 
 
 
 class Runner(object):
@@ -172,20 +104,23 @@ class Runner(object):
         tune.run(
             self.config["algorithm"]["name"],
             checkpoint_freq=1,
+            # callbacks=[WandbLoggerCallback(
+            #    project="Optimization_Project",
+            #    api_key="",
+            #    log_config=True)],
             config={
                 "framework": self.config["framework"],
                 "env": self.env_config["name"],
-                "rollout_fragment_length": 1,
+                # "rollout_fragment_length": 81,
                 # "sgd_minibatch_size": 32,
-                "train_batch_size": self.config["algorithm"]["train_batch_size"],
+                # "train_batch_size": self.config["algorithm"]["train_batch_size"],
                 # "prioritized_replay": False,
                 # "batch_mode": "complete_episodes",
                 "callbacks": partial(MyCallback, self.config),
-                "num_gpus": 0,
-                "num_workers": 1
-                # "multiagent": {
-                # "replay_mode": "lockstep",
-                # },
-                # "num_cpus_per_worker":1
+                # "num_gpus": 0,
+                "num_workers": 1,
+
+
+
             },
         )

@@ -1,0 +1,35 @@
+wandb_version: 1
+
+_wandb:
+  desc: null
+  value:
+    cli_version: 0.12.10
+    framework: torch
+    is_jupyter_run: false
+    is_kaggle_kernel: false
+    python_version: 3.9.9
+    start_time: 1647434523
+    t:
+      1:
+      - 1
+      2:
+      - 1
+      3:
+      - 2
+      - 13
+      - 14
+      - 16
+      4: 3.9.9
+      5: 0.12.10
+      8:
+      - 6
+      - 9
+env:
+  desc: null
+  value: prison_v3
+framework:
+  desc: null
+  value: torch
+num_workers:
+  desc: null
+  value: 1

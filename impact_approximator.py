@@ -38,7 +38,7 @@ class ImpactApproximator(object):
 
     def _init_critic(self) -> Policy:
         return DQNTorchPolicy(
-            self.observation_space, self.action_space, {"num_gpus": 0, "num_workers": 1}
+            self.observation_space, self.action_space, {"num_gpus": 0, "num_workers": 1}, 
         )
 
     def _init_tim_measurement(self) -> torch.Tensor:
@@ -63,9 +63,12 @@ class ImpactApproximator(object):
     def update_impact_measurement(
         self, obs: torch.Tensor, actions: torch.Tensor
     ) -> torch.Tensor:
+        
         impact_samples = self.get_impact_samples_for_batch(obs, actions)
         self._update_tim(impact_samples)
-        self._update_sim(obs, impact_samples)
+        #self._update_sim(obs, impact_samples)
+
+        
         return impact_samples
 
     def _update_tim(self, impact_samples: torch.Tensor):
