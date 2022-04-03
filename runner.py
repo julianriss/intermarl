@@ -19,7 +19,7 @@ from ray.rllib.policy.sample_batch import SampleBatch
 import src.utils_folder.array_utils as ar_ut
 from impact_approximator import ImpactApproximator
 from src.data_loader.replay_buffer import ReplayBuffer
-
+import torch
 import mpu
 
 
@@ -65,6 +65,7 @@ class MyCallback(DefaultCallbacks):
     def on_postprocess_trajectory(self, *, worker, episode, agent_id, policy_id, policies, postprocessed_batch, original_batches, **kwargs):
         self.count += 1
 
+        mpu.io.write("logs/pbcon.pickle", SampleBatch.concat_samples([postprocessed_batch, postprocessed_batch]))
         if(postprocessed_batch.__len__() == 1):
             self.collected_postprocessed_batch = np.append(self.collected_postprocessed_batch, postprocessed_batch)
 
@@ -74,23 +75,26 @@ class MyCallback(DefaultCallbacks):
                 self.collected_postprocessed_batch = np.array([])
 
 
-            if self.replay_buffer.push_count > 1:
+            if self.replay_buffer.buffer[0].__len__() > 10:
                 for i in range(0, 4):
 
                     #Sample wird aus Replaybuffer für agenten i geholt
-                    sample = self.replay_buffer.sample_batch()[0][i]
+                    sample = self.replay_buffer.sample_batch(81, i)
 
-                    #mpu.io.write("logs/sample" + str(i) + ".pickle", sample)
+                    mpu.io.write("logs/sample.pickle", sample)
 
                     #critic für Agenten i mit sample für Agenten i trainieren
                     self.criticsarray[i].train_critic(sample)
                     print("Agent ", i, " :", self.criticsarray[i].get_tim_approximation(), " Sum: ",  self.criticsarray[i].get_tim_approximation().sum())
                     
-                
+                    sampleupdateim = self.replay_buffer.sample_batch(1, i)
+
                     self.criticsarray[i].update_impact_measurement(
-                        sample[SampleBatch.OBS],
-                        sample[SampleBatch.ACTIONS],
+                        torch.tensor(sampleupdateim[SampleBatch.OBS]),
+                        torch.tensor(sampleupdateim[SampleBatch.ACTIONS])
                     )
+
+                    
         return 
 
 

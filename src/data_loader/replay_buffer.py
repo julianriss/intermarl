@@ -8,7 +8,8 @@ from numpy.random import choice
 
 from src.data_loader.data_handler import BaseDataHandler, PrisonDataHandler
 from ray.rllib.policy.sample_batch import SampleBatch
-
+from collections import deque
+import mpu
 
 class ReplayBuffer(object):
     def __init__(self, config: Dict) -> None:
@@ -17,7 +18,7 @@ class ReplayBuffer(object):
         self.im_config = config["impact_measurement"]
         self.buffer_size = self.im_config["buffer_size"]
         self.sampling_size = self.im_config["sampling_size"]
-        self.buffer = []
+        self.buffer = [deque(maxlen=self.buffer_size)] * 4
         self.push_count = 0
 
     def _init_data_handler(self, config) -> BaseDataHandler:
@@ -29,16 +30,22 @@ class ReplayBuffer(object):
             raise ValueError("No data_handler for specified env found!")
 
     def add_data_to_buffer(self, data, pb_structure, action_space_size):
-        rewarded_batches = self.data_handler.transform_postprocessed_batch(
+        rewarded_batch = self.data_handler.transform_postprocessed_batch(
             data, pb_structure, action_space_size)
 
-        if len(self.buffer) < self.buffer_size:
-            self.buffer.append(rewarded_batches)
-        else:
-            self.buffer.append[self.push_count % self.buffer_size] = rewarded_batches
-        self.push_count += 1
+        
+        for i in range(0, rewarded_batch.__len__()):
+            self.buffer[i].append(rewarded_batch[i])
+
     pass
 
-    def sample_batch(self):
-        return random.sample(self.buffer, 1)
+    def sample_batch(self, size, agentid):
+        samples = random.choices(self.buffer[agentid], k=size)
+       
+        samples = SampleBatch.concat_samples(samples)
+        
+        #mpu.io.write("logs/samplesnew.pickle", samples)
+        
+        return samples
+        
         
