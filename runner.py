@@ -15,12 +15,14 @@ from ray import tune
 from ray.rllib.agents.callbacks import DefaultCallbacks
 from ray.rllib.models import ModelCatalog
 from ray.rllib.policy.sample_batch import SampleBatch
+from collections import deque
 
 import src.utils_folder.array_utils as ar_ut
 from impact_approximator import ImpactApproximator
 from src.data_loader.replay_buffer import ReplayBuffer
 import torch
 import mpu
+import matplotlib.pyplot as plt
 
 
 def discretizeactions(
@@ -34,13 +36,40 @@ def getBatchSize(batch):
     return int(str(batch).split("SampleBatch(", 1)[1].split(":", 1)[0])
 
 
+def print_shape(batch):
+    print("\n\nObs:")
+    print(batch[SampleBatch.OBS].shape)
+
+    print("\n\nObs_next:")
+    print(batch[SampleBatch.NEXT_OBS].shape)
+
+    print("\n\nAction:")
+    print(batch[SampleBatch.ACTIONS].shape)
+
+    print("\n\nReward:")
+    print(batch[SampleBatch.REWARDS].shape)
+
+
+def not_hot_encoded_batch_to_hot_encoded_batch(batch):
+    cbatch = copy.deepcopy(batch)
+    actionint = int(cbatch[SampleBatch.ACTIONS][0])
+    hot_encoded = np.zeros(81)
+    hot_encoded[actionint] = 1
+    SampleBatch.__setitem__(
+        cbatch, SampleBatch.ACTIONS, hot_encoded[np.newaxis, :]
+    )
+    return cbatch
+
+
 class MyCallback(DefaultCallbacks):
 
     def __init__(self, config: Dict, legacy_callbacks_dict: Dict[str, callable] = None):
+        self.one_hot_encoding = False
         self.batch_list = []
+        self.batchsize = 0
         self.batch = np.array([])
         self.collected_postprocessed_batch = np.array([])
-        self.concatenatedbatch = []  
+        self.concatenatedbatch = []
         self.batchcounter = 0
         self.i = None
         self.e = None
@@ -52,7 +81,15 @@ class MyCallback(DefaultCallbacks):
         self.criticsarray = self._init_critics()
         self.replay_buffer = self._init_replay_buffer()
         self.count = 0
-        self.average = [0,0,0,0]
+        self.average = [0, 0, 0, 0]
+        self.one = deque(maxlen=100)
+        self.two = deque(maxlen=100)
+        self.three = deque(maxlen=100)
+        self.four = deque(maxlen=100)
+        if self.one_hot_encoding == True:
+            self.batchsize = 81
+        if self.one_hot_encoding == False:
+            self.batchsize = 256
 
         super().__init__(legacy_callbacks_dict=legacy_callbacks_dict)
 
@@ -65,37 +102,50 @@ class MyCallback(DefaultCallbacks):
     def on_postprocess_trajectory(self, *, worker, episode, agent_id, policy_id, policies, postprocessed_batch, original_batches, **kwargs):
         self.count += 1
 
-        mpu.io.write("logs/pbcon.pickle", SampleBatch.concat_samples([postprocessed_batch, postprocessed_batch]))
+    
         if(postprocessed_batch.__len__() == 1):
-            self.collected_postprocessed_batch = np.append(self.collected_postprocessed_batch, postprocessed_batch)
+            self.collected_postprocessed_batch = np.append(
+                self.collected_postprocessed_batch, postprocessed_batch)
 
-            #Wenn self.collected_postprocessed_batch batches von allen 4 agenten enthält, wird er an den replay buffer übergeben und dort weiter verarbeitet  
+            # Wenn self.collected_postprocessed_batch batches von allen 4 agenten enthält, wird er an den replay buffer übergeben und dort weiter verarbeitet
             if agent_id == "prisoner_" + str(self.num_agents - 1):
-                self.replay_buffer.add_data_to_buffer(self.collected_postprocessed_batch, postprocessed_batch, self.action_space_sizes)
+                self.replay_buffer.add_data_to_buffer(
+                    self.collected_postprocessed_batch, postprocessed_batch, self.action_space_sizes, one_hot_encoding=self.one_hot_encoding)
                 self.collected_postprocessed_batch = np.array([])
-
 
             if self.replay_buffer.buffer[0].__len__() > 10:
                 for i in range(0, 4):
 
-                    #Sample wird aus Replaybuffer für agenten i geholt
-                    sample = self.replay_buffer.sample_batch(81, i)
+                    #verkettetes Sample wird aus Replaybuffer für agenten i geholt
+                    sample = self.replay_buffer.sample_batch(self.batchsize, i)
 
-                    mpu.io.write("logs/sample.pickle", sample)
-
-                    #critic für Agenten i mit sample für Agenten i trainieren
+                    # critic für Agenten i mit sample für Agenten i trainieren
                     self.criticsarray[i].train_critic(sample)
-                    print("Agent ", i, " :", self.criticsarray[i].get_tim_approximation(), " Sum: ",  self.criticsarray[i].get_tim_approximation().sum())
-                    
-                    sampleupdateim = self.replay_buffer.sample_batch(1, i)
 
-                    self.criticsarray[i].update_impact_measurement(
-                        torch.tensor(sampleupdateim[SampleBatch.OBS]),
-                        torch.tensor(sampleupdateim[SampleBatch.ACTIONS])
-                    )
 
-                    
-        return 
+                    #batch der größe 1 aus dem replay buffer holfen Impact Measurements upzudaten
+                    batchfortim = self.replay_buffer.sample_batch(1, i)
+
+                    #Implementierung des Impact Measurement updated nimmt nur hot encoded Actions an. deswegen manuelle umwandlung
+                    if self.one_hot_encoding == False:
+                        hotbatchfortim = not_hot_encoded_batch_to_hot_encoded_batch(
+                            batchfortim)
+                        self.criticsarray[i].update_impact_measurement(
+                            torch.tensor(hotbatchfortim[SampleBatch.OBS]),
+                            torch.tensor(hotbatchfortim[SampleBatch.ACTIONS])
+                        )
+                    if self.one_hot_encoding == True:
+                        self.criticsarray[i].update_impact_measurement(
+                            torch.tensor(batchfortim[SampleBatch.OBS]),
+                            torch.tensor(batchfortim[SampleBatch.ACTIONS])
+                        )
+
+                    #print(self.criticsarray[i].get_q_values(torch.tensor(hotbatchfortim[SampleBatch.OBS])))
+                    print("Agent ", i, ": ",self.criticsarray[i].get_tim_approximation())
+                #criticdata = self.criticsarray[0].get_tim_approximation().detach().numpy()
+
+    
+        return
 
 
 class Runner(object):
@@ -115,6 +165,7 @@ class Runner(object):
             config={
                 "framework": self.config["framework"],
                 "env": self.env_config["name"],
+                # "env": "cooperative_pong_v4",
                 # "rollout_fragment_length": 81,
                 # "sgd_minibatch_size": 32,
                 # "train_batch_size": self.config["algorithm"]["train_batch_size"],

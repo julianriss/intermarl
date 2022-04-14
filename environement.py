@@ -2,7 +2,7 @@ from typing import Dict
 
 import supersuit as ss
 from gym.spaces import Dict, MultiDiscrete, Tuple
-from pettingzoo.butterfly import pistonball_v5, prison_v3
+from pettingzoo.butterfly import pistonball_v5, prison_v4
 from ray.rllib.env import PettingZooEnv
 from ray.rllib.env.multi_agent_env import ENV_STATE
 from ray.tune.registry import register_env
@@ -21,7 +21,7 @@ class Environment(object):
     def env_creator(self):
         # self.env = prison_v3.env(num_floors=2, vector_observation=True)
 
-        self.env = prison_v3.env(
+        self.env = prison_v4.env(
             vector_observation=True,
             continuous=False,
             synchronized_start=True,
@@ -42,5 +42,5 @@ class Environment(object):
     def registerenv(self):
         self.env_creator()
 
-        register_env("prison_v3", lambda config: PettingZooEnv(self.env))
+        register_env("prison_v4", lambda config: PettingZooEnv(self.env))
         pass

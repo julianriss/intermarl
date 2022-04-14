@@ -88,6 +88,17 @@ def decode_discrete_actions(
         decoded_actions = nodes_to_actions(decoded_actions, action_space)
     return decoded_actions
 
+def decode(encoded_actions):
+    for i in range(len(encoded_actions)):
+        if encoded_actions[i] == 1:
+            return i
+
+def encode(decoded):
+    a = np.zeros(81)
+    a[decoded[0]] = 1
+    return a
+    
+
 
 def main():
     action_space = (3, 4, 5, 6)

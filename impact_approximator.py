@@ -24,6 +24,8 @@ class ImpactApproximator(object):
         self.observation_space = self.env_config["observation_space"]
         self.action_space = self.env_config["action_space"]
 
+        
+
         self.tim_measurement = self._init_tim_measurement()
         self.sim_measurement = (
             self._init_sim_measurement()

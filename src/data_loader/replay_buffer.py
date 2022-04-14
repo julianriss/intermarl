@@ -22,16 +22,16 @@ class ReplayBuffer(object):
         self.push_count = 0
 
     def _init_data_handler(self, config) -> BaseDataHandler:
-        if self.config["rl_env"]["name"] == "prison_v3":
+        if self.config["rl_env"]["name"] == "prison_v4":
             return PrisonDataHandler(config)
         elif self.config["rl_env"]["name"] == "pistonball_v5":
             raise NotImplementedError
         else:
             raise ValueError("No data_handler for specified env found!")
 
-    def add_data_to_buffer(self, data, pb_structure, action_space_size):
+    def add_data_to_buffer(self, data, pb_structure, action_space_size, one_hot_encoding):
         rewarded_batch = self.data_handler.transform_postprocessed_batch(
-            data, pb_structure, action_space_size)
+            data, pb_structure, action_space_size, one_hot_encoding)
 
         
         for i in range(0, rewarded_batch.__len__()):
