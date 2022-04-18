@@ -2,14 +2,11 @@ import random
 from collections import deque, namedtuple
 from typing import Dict
 
-import numpy as np
-import torch
-from numpy.random import choice
+import mpu
+from ray.rllib.policy.sample_batch import SampleBatch
 
 from src.data_loader.data_handler import BaseDataHandler, PrisonDataHandler
-from ray.rllib.policy.sample_batch import SampleBatch
-from collections import deque
-import mpu
+
 
 class ReplayBuffer(object):
     def __init__(self, config: Dict) -> None:
@@ -17,8 +14,8 @@ class ReplayBuffer(object):
         self.data_handler = self._init_data_handler(config)
         self.im_config = config["impact_measurement"]
         self.buffer_size = self.im_config["buffer_size"]
-        self.sampling_size = self.im_config["sampling_size"]
-        self.buffer = [deque(maxlen=self.buffer_size)] * 4
+        self.num_agents = self.config["rl_env"]["num_agents"]
+        self.buffer = [deque(maxlen=self.buffer_size)] * self.num_agents
         self.push_count = 0
 
     def _init_data_handler(self, config) -> BaseDataHandler:
@@ -29,23 +26,21 @@ class ReplayBuffer(object):
         else:
             raise ValueError("No data_handler for specified env found!")
 
-    def add_data_to_buffer(self, data, pb_structure, action_space_size, one_hot_encoding):
+    def add_data_to_buffer(
+        self, data, pb_structure, action_space_size, one_hot_encoding
+    ):
         rewarded_batch = self.data_handler.transform_postprocessed_batch(
-            data, pb_structure, action_space_size, one_hot_encoding)
-
-        
+            data, pb_structure, action_space_size, one_hot_encoding
+        )
         for i in range(0, rewarded_batch.__len__()):
             self.buffer[i].append(rewarded_batch[i])
 
-    pass
-
     def sample_batch(self, size, agentid):
         samples = random.choices(self.buffer[agentid], k=size)
-       
         samples = SampleBatch.concat_samples(samples)
-        
-        #mpu.io.write("logs/samplesnew.pickle", samples)
-        
+        mpu.io.write("logs/multi_agent_learn_batch.pickle", samples)
         return samples
-        
-        
+
+    def draw_latest_data(self, size, agent_id):
+        samples = list(self.buffer[agent_id])[-size:]
+        return SampleBatch.concat_samples(samples)

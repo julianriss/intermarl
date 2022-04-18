@@ -24,8 +24,6 @@ class ImpactApproximator(object):
         self.observation_space = self.env_config["observation_space"]
         self.action_space = self.env_config["action_space"]
 
-        
-
         self.tim_measurement = self._init_tim_measurement()
         self.sim_measurement = (
             self._init_sim_measurement()
@@ -40,7 +38,9 @@ class ImpactApproximator(object):
 
     def _init_critic(self) -> Policy:
         return DQNTorchPolicy(
-            self.observation_space, self.action_space, {"num_gpus": 0, "num_workers": 1}, 
+            self.observation_space,
+            self.action_space,
+            {"num_gpus": 0, "num_workers": 1, "hiddens": [64]},
         )
 
     def _init_tim_measurement(self) -> torch.Tensor:
@@ -60,17 +60,15 @@ class ImpactApproximator(object):
         return q_tp1
 
     def train_critic(self, batch):
-        self.critic.learn_on_batch(batch)
+        test_ret = self.critic.learn_on_batch(batch)
 
     def update_impact_measurement(
         self, obs: torch.Tensor, actions: torch.Tensor
     ) -> torch.Tensor:
-        
+
         impact_samples = self.get_impact_samples_for_batch(obs, actions)
         self._update_tim(impact_samples)
-        #self._update_sim(obs, impact_samples)
-
-        
+        # self._update_sim(obs, impact_samples)
         return impact_samples
 
     def _update_tim(self, impact_samples: torch.Tensor):

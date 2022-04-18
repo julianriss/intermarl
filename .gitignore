@@ -3,6 +3,7 @@ logs/
 .vscode
 riss-analyzing-influence-in-marl/
 outputs/
+wandb/
 
 ### Linux ###
 *~

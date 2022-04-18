@@ -19,8 +19,6 @@ class Environment(object):
         return "test"
 
     def env_creator(self):
-        # self.env = prison_v3.env(num_floors=2, vector_observation=True)
-
         self.env = prison_v4.env(
             vector_observation=True,
             continuous=False,

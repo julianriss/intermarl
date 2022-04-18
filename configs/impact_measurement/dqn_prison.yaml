@@ -1,6 +1,9 @@
 name: "dqn_prison"
 buffer_size: 10000
-sampling_size: 256
+critic_batch_size: 256
+critic_update_rate: 32
+impact_batch_size: 256
+impact_update_rate: 32
 tim_initial_step_size: 0.05
 tim_step_size_decay: 0.9999
 sim_learning_rate: 0.0005
