@@ -190,13 +190,6 @@ class MyCallback(DefaultCallbacks):
 
     def _update_critics(self):
         if (self.count / self.num_agents) % self.im_config["critic_update_rate"] == 0:
-            print(
-                "Update_Critics step: "
-                + str(
-                    (self.count / self.num_agents)
-                    / self.im_config["critic_update_rate"]
-                )
-            )
             for i in range(self.num_agents):
                 # verkettetes Sample wird aus Replaybuffer für agenten i geholt
                 sample = self.replay_buffer.sample_batch(self.critic_batch_size, i)
