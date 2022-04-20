@@ -1,8 +1,7 @@
 import hydra
 
 import src.utils_folder.config_utils as cf_ut
-from environement import Environment
-from runner import Runner
+from src.runner import Runner
 
 
 def get_config():
@@ -14,11 +13,8 @@ def get_config():
 
 def main():
     config = get_config()
-
-    environment = Environment()
-    environment.registerenv()
-
     cf_ut.enrich_config_file(config)
+
     runner = Runner(config)
     runner.run()
 

@@ -13,7 +13,7 @@ class ReplayBuffer(object):
         self.config = config
         self.data_handler = self._init_data_handler(config)
         self.im_config = config["impact_measurement"]
-        self.buffer_size = self.im_config["buffer_size"]
+        self.buffer_size = 1000
         self.num_agents = self.config["rl_env"]["num_agents"]
         self.buffer = [deque(maxlen=self.buffer_size)] * self.num_agents
         self.push_count = 0

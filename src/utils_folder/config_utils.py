@@ -15,7 +15,7 @@ def enricht_config_by_env_specifications(config: Dict):
             [3 for k in range(config["rl_env"]["num_agents"])]
         )
         config["rl_env"]["observation_space"] = Box(
-            -300.0, 300.0, (config["rl_env"]["num_agents"],), float32
+            0.0, 300.0, (config["rl_env"]["num_agents"],), float32
         )
         config["rl_env"]["action_space"] = Discrete(
             np.prod(config["rl_env"]["action_space_sizes"])

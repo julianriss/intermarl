@@ -1,6 +1,8 @@
 framework: "torch"
+total_num_simulations: 10_000_000
+algo_model_sharing: True
 defaults:
   - rl_env: prison
-  - algorithm: dqn
+  - algorithm: random_policy
   - impact_measurement: dqn_prison
   - _self_

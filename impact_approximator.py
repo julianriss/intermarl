@@ -2,12 +2,11 @@ from email.policy import Policy
 from typing import Dict
 
 import torch
-from ray.rllib.agents.dqn.dqn_torch_policy import DQNTorchPolicy, compute_q_values
 
 import src.utils_folder.array_utils as ar_ut
+import src.utils_folder.env_utils as env_ut
 import src.utils_folder.network_utils as nw_ut
-
-dir = "/Users/julian/Desktop/"
+from src.models.custom_dqn import NonRolloutDQN
 
 
 class ImpactApproximator(object):
@@ -37,10 +36,19 @@ class ImpactApproximator(object):
         self.critic = self._init_critic()
 
     def _init_critic(self) -> Policy:
-        return DQNTorchPolicy(
-            self.observation_space,
-            self.action_space,
-            {"num_gpus": 0, "num_workers": 1, "hiddens": [64]},
+        dummy_env = env_ut.get_impact_dqn_env(self.config, self.agent_id)
+        im_config = self.config["impact_measurement"]
+        return NonRolloutDQN(
+            "MlpPolicy",
+            dummy_env,
+            self.config,
+            learning_starts=im_config["critic_learning_start"],
+            buffer_size=im_config["buffer_size"],
+            tau=im_config["tau"],
+            gradient_steps=im_config["critic_num_sgd_steps_per_update_iter"],
+            update_rate=im_config["critic_update_rate"],
+            agent_id=self.agent_id,
+            learning_rate=im_config["critic_learning_rate"],
         )
 
     def _init_tim_measurement(self) -> torch.Tensor:
@@ -50,22 +58,14 @@ class ImpactApproximator(object):
         return nw_ut.get_impact_network(self.config)
 
     def get_q_values(self, obs):
-        q_tp1, _, _, _ = compute_q_values(
-            self.critic,
-            self.critic.target_models[self.critic.model],
-            {"obs": obs},
-            explore=False,
-            is_training=False,
-        )
-        return q_tp1
+        return self.critic.get_q_values(obs)
 
-    def train_critic(self, batch):
-        test_ret = self.critic.learn_on_batch(batch)
+    def train_critic(self, actions, new_obs, rewards, dones, infos):
+        self.critic.learn(actions, new_obs, rewards, dones, infos)
 
     def update_impact_measurement(
         self, obs: torch.Tensor, actions: torch.Tensor
     ) -> torch.Tensor:
-
         impact_samples = self.get_impact_samples_for_batch(obs, actions)
         self._update_tim(impact_samples)
         # self._update_sim(obs, impact_samples)

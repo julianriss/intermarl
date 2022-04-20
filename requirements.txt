@@ -70,6 +70,7 @@ wrapt==1.13.3
 pettingzoo
 pettingzoo\[butterfly\]
 SuperSuit
+stable-baselines3
 pre-commit
 black
 isort

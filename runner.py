@@ -14,6 +14,7 @@ from ray.tune.integration.wandb import WandbLoggerCallback
 
 import src.utils_folder.array_utils as ar_ut
 from impact_approximator import ImpactApproximator
+from src.data_loader.data_handler import BaseDataHandler, PrisonDataHandler
 from src.data_loader.replay_buffer import ReplayBuffer
 
 
@@ -55,12 +56,21 @@ class MyCallback(DefaultCallbacks):
         self.action_space_sizes = self.env_config["action_space_sizes"]
         self.critic_batch_size = self.im_config["critic_batch_size"]
         self.criticsarray = self._init_critics()
+        self.data_handler = self._init_data_handler(config)
         self.replay_buffer = self._init_replay_buffer()
         self.count = 0
         if self.one_hot_encoding == True:
             self.critic_batch_size = 81
 
         super().__init__(legacy_callbacks_dict=legacy_callbacks_dict)
+
+    def _init_data_handler(self, config) -> BaseDataHandler:
+        if self.config["rl_env"]["name"] == "prison_v4":
+            return PrisonDataHandler(config)
+        elif self.config["rl_env"]["name"] == "pistonball_v5":
+            raise NotImplementedError
+        else:
+            raise ValueError("No data_handler for specified env found!")
 
     def _init_critics(self) -> List[ImpactApproximator]:
         return [ImpactApproximator(self.config, i) for i in range(self.num_agents)]
@@ -100,6 +110,20 @@ class MyCallback(DefaultCallbacks):
             # Wenn self.collected_postprocessed_batch batches von allen 4 agenten enthält, wird er an den replay buffer übergeben und dort weiter verarbeitet
             if int(agent_id.split("_")[-1]) == (self.num_agents - 1):
                 # TODO: This does not work if some agents die or the order changes at some point
+                rewarded_batch = self.data_handler.transform_postprocessed_batch(
+                    self.collected_postprocessed_batch,
+                    postprocessed_batch,
+                    self.action_space_sizes,
+                    self.one_hot_encoding,
+                )
+                for i in range(0, rewarded_batch.__len__()):
+                    self.criticsarray[i].critic.learn(
+                        rewarded_batch[i]["actions"],
+                        rewarded_batch[i]["new_obs"],
+                        rewarded_batch[i]["rewards"],
+                        rewarded_batch[i]["dones"],
+                        rewarded_batch[i]["infos"],
+                    )
                 self.replay_buffer.add_data_to_buffer(
                     self.collected_postprocessed_batch,
                     postprocessed_batch,
@@ -108,7 +132,6 @@ class MyCallback(DefaultCallbacks):
                 )
                 self.collected_postprocessed_batch = np.array([])
 
-            self._update_critics()
             self._update_impact_measurements()
             # criticdata = self.criticsarray[0].get_tim_approximation().detach().numpy()
         return
@@ -162,6 +185,10 @@ class MyCallback(DefaultCallbacks):
                     + "; action type: "
                     + ma_action_desc
                 ] = float(q_value)
+                """if ma_state_desc == "close_left_1" and ma_action_desc == "left_1":
+                    print(float(q_value))
+                    print(ma_obs_tensor)
+                    print(ma_actions)"""
 
         single_agent_obs_to_track = {
             "close_left_1": [10.0],
@@ -174,7 +201,7 @@ class MyCallback(DefaultCallbacks):
             sa_obs_tensor = torch.tensor([sa_obs])
             sa_q_values, _, _, _ = compute_q_values(
                 policy,
-                policy.target_models[policy.model],
+                policy.model,
                 {"obs": sa_obs_tensor},
                 explore=False,
                 is_training=False,
@@ -188,14 +215,14 @@ class MyCallback(DefaultCallbacks):
                     + action_desc
                 ] = float(q_value)
 
-    def _update_critics(self):
+    """def _update_critics(self):
         if (self.count / self.num_agents) % self.im_config["critic_update_rate"] == 0:
             for i in range(self.num_agents):
                 # verkettetes Sample wird aus Replaybuffer für agenten i geholt
                 sample = self.replay_buffer.sample_batch(self.critic_batch_size, i)
 
                 # critic für Agenten i mit sample für Agenten i trainieren
-                self.criticsarray[i].train_critic(sample)
+                self.criticsarray[i].train_critic(sample)"""
 
 
 class Runner(object):
