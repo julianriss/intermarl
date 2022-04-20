@@ -3,6 +3,6 @@ total_num_simulations: 10_000_000
 algo_model_sharing: True
 defaults:
   - rl_env: prison
-  - algorithm: random_policy
+  - algorithm: dqn
   - impact_measurement: dqn_prison
   - _self_

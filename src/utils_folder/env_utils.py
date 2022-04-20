@@ -24,26 +24,18 @@ def get_simulation_env(config: Dict):
         raise ValueError("No valid environment chosen!")
 
 
-def get_impact_dqn_env(config: Dict, agent_id: int):
-    return DummyEnvForSpaces(config["rl_env"]["name"], agent_id, config)
-
-
 class DummyEnvForSpaces(gym.Env):
     """Custom Environment that follows gym interface"""
 
     metadata = {"render.modes": ["human"]}
 
-    def __init__(self, env_type: str, agent_id: int, info_dict: Dict = None):
+    def __init__(self, action_space, observation_space, agent_id):
         super(DummyEnvForSpaces, self).__init__()
         # Define action and observation space
         # They must be gym.spaces objects
         # Example when using discrete actions:
         self.agent_id = agent_id
-        action_space, observation_space = get_env_single_agent_impact_action_and_observation_spaces(
-            env_type, agent_id, info_dict
-        )
         self.action_space = action_space
-        # Example for using image as input (channel-first; channel-last also works):
         self.observation_space = observation_space
 
     def step(self, action):
@@ -78,3 +70,16 @@ def get_prison_v4_im_action_space(info_dict) -> spaces.Discrete:
 
 def get_prison_v4_im_observation_space(info_dict) -> spaces.Box:
     return info_dict["rl_env"]["observation_space"]
+
+
+def get_impact_dqn_env(config: Dict, agent_id: int):
+    action_space, observation_space = get_env_single_agent_impact_action_and_observation_spaces(
+        config["rl_env"]["name"], agent_id, config
+    )
+    return DummyEnvForSpaces(action_space, observation_space, agent_id)
+
+
+def get_single_agent_dummy_env(config: Dict, agent_id: int) -> DummyEnvForSpaces:
+    action_space = config["rl_env"]["sa_action_spaces"][agent_id]
+    observation_space = config["rl_env"]["sa_observation_spaces"][agent_id]
+    return DummyEnvForSpaces(action_space, observation_space, agent_id)

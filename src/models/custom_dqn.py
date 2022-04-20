@@ -20,7 +20,7 @@ class NonRolloutDQN(DQN):
         total_time_steps: int = 1_000_000,
         learning_rate: Union[float, Schedule] = 0.0001,
         buffer_size: int = 1000000,
-        learning_starts: int = 50000,
+        learning_starts: int = 10000,
         batch_size: int = 32,
         tau: float = 1,
         gamma: float = 0.99,
@@ -120,21 +120,7 @@ class NonRolloutDQN(DQN):
             self.num_collected_steps > 0
             and self.num_collected_steps > self.learning_starts
         ):
-            if self.num_collected_steps % 1000 == 0:
-                if self.agent_id == 0:
-                    obs_to_track = torch.tensor(
-                        [[10.0, 10.0, 10.0, 10.0], [150.0, 10.0, 10.0, 150.0]]
-                    )
-
-                    q_values = self.get_q_values(obs_to_track)
-                    print("Q-values: ")
-                    print(
-                        "Train Net close left, action left: "
-                        + str(float(q_values[0, 0]))
-                    )
-                    print(
-                        "Train Net center, action left: " + str(float(q_values[1, 0]))
-                    )
+            if self.num_collected_steps % self.update_rate == 0:
                 self.train(
                     batch_size=self.batch_size, gradient_steps=self.gradient_steps
                 )
@@ -204,6 +190,10 @@ class NonRolloutDQN(DQN):
 
         self.logger.record("train/n_updates", self._n_updates, exclude="tensorboard")
         self.logger.record("train/loss", np.mean(losses))
+
+    def get_action(self, obs):
+        env_action, _ = self.predict(obs)
+        return env_action
 
     def get_q_values(self, obs):
         with torch.no_grad():

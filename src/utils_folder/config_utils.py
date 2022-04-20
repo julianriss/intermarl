@@ -20,3 +20,11 @@ def enricht_config_by_env_specifications(config: Dict):
         config["rl_env"]["action_space"] = Discrete(
             np.prod(config["rl_env"]["action_space_sizes"])
         )
+
+        config["rl_env"]["sa_observation_spaces"] = [
+            Box(0.0, 300.0, (1,), float32)
+            for i in range(config["rl_env"]["num_agents"])
+        ]
+        config["rl_env"]["sa_action_spaces"] = [
+            Discrete(3) for i in range(config["rl_env"]["num_agents"])
+        ]

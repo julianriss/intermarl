@@ -138,21 +138,11 @@ class Runner(object):
                 self.env.step(action_for_env)
                 if len(done_list) == self.num_agents and all(done_list):
                     self.env.reset()
-                new_obs, new_reward, new_done, new_info = self.env.last()
+                new_obs, new_reward, _, new_info = self.env.last()
                 self._store_transition_data(
                     new_obs, action_for_buffer, new_reward, done, new_info, agent_id
                 )
-                import numpy as np
-
-                if (
-                    np.isnan(new_obs).any()
-                    or np.isnan(action_for_buffer).any()
-                    or np.isnan(new_reward).any()
-                    or np.isnan(done).any()
-                ):
-                    print("There is missing data!")
-                if (obs < 0.0).any() or (obs > 300.0).any():
-                    print("obs outside of box bounds!")
+            self._update_policies()
             self._train_critics_of_impact_measurers()
             if (
                 self.impact_data_batch_size
@@ -168,14 +158,27 @@ class Runner(object):
                 reward_list = []
             import torch
 
-            if i % 10_000 == 0:
-                obs_to_track = torch.tensor(
+            if i % 2_000 == 0:
+                ma_obs_to_track = torch.tensor(
                     [[10.0, 10.0, 10.0, 10.0], [150.0, 10.0, 10.0, 150.0]]
                 )
-
-                q_values = self.impact_measurers[3].get_q_values(obs_to_track)
+                sa_obs_to_track = torch.tensor([[10.0], [150.0]])
+                ma_q_values = self.impact_measurers[3].get_q_values(ma_obs_to_track)
+                sa_q_values = self.agent_policies[0].get_q_values(sa_obs_to_track)
                 print("Q-values: ")
                 print(
-                    "Train Net close left, action left: " + str(float(q_values[0, 0]))
+                    "Impact measure net close left, action left: "
+                    + str(float(ma_q_values[0, 0]))
                 )
-                print("Train Net center, action left: " + str(float(q_values[1, 0])))
+                print(
+                    "Impact measure net center, action left: "
+                    + str(float(ma_q_values[1, 0]))
+                )
+
+                print(
+                    "Policy net close left, action left: "
+                    + str(float(sa_q_values[0, 0]))
+                )
+                print(
+                    "Policy net center, action left: " + str(float(sa_q_values[1, 0]))
+                )
