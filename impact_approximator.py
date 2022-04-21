@@ -52,7 +52,7 @@ class ImpactApproximator(object):
     def get_q_values(self, obs):
         q_tp1, _, _, _ = compute_q_values(
             self.critic,
-            self.critic.target_models[self.critic.model],
+            self.critic.model,
             {"obs": obs},
             explore=False,
             is_training=False,
