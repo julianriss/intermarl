@@ -3,6 +3,7 @@ from typing import Any, Dict
 
 import numpy as np
 import torch
+import wandb
 
 import src.utils_folder.algo_utils as algo_ut
 import src.utils_folder.array_utils as ar_ut
@@ -21,6 +22,8 @@ class Runner(object):
         self.step_info_dict = {agent_id: None for agent_id in range(self.num_agents)}
         self.impact_batch_dict = self._get_empty_impact_batch_dict()
         self.impact_data_batch_size = 0
+        self.reward = 0
+        wandb.init()
 
     def _init_impact_measurers(self) -> Dict[int, ImpactApproximator]:
         return {i: ImpactApproximator(self.config, i) for i in range(self.num_agents)}
@@ -126,8 +129,8 @@ class Runner(object):
     def run(self):
         self.env.reset()
         for i in range(self.total_num_simulations):
-            if i % 2_000 == 0:
-                print("On step: " + str(i))
+            #if i % 2_000 == 0:
+                #print("On step: " + str(i))
             done_list = []
             for agent_id in range(self.num_agents):
                 obs, _, done, _ = self.env.last()
@@ -142,6 +145,8 @@ class Runner(object):
                 self._store_transition_data(
                     new_obs, action_for_buffer, new_reward, done, new_info, agent_id
                 )
+                self.reward += self.step_info_dict[agent_id]["rewards"][0]
+                #print(self.reward)
             self._update_policies()
             self._train_critics_of_impact_measurers()
             if (
@@ -153,32 +158,26 @@ class Runner(object):
                 self._update_impact_measures()
 
             ## Maybe some logging from this point onward ##
-            if i % 150 == 0 and i > 0:
-                # print("Average reward last rollout: " + str(np.sum(reward_list) / 4))
-                reward_list = []
+            if i % 500 == 0 and i > 0:
+                print("Step: ", i)
+                ar = self.reward / 4
+                print("Average reward last rollout: " + str(ar))
+                wandb.log({"Average Reward": ar}, step=i)
+
+                self.reward = 0
+
             import torch
 
             if i % 2_000 == 0:
                 ma_obs_to_track = torch.tensor(
                     [[10.0, 10.0, 10.0, 10.0], [150.0, 10.0, 10.0, 150.0]]
                 )
-                sa_obs_to_track = torch.tensor([[10.0], [150.0]])
+                sa_obs_to_track = torch.tensor([[290.0], [150.0]])
                 ma_q_values = self.impact_measurers[3].get_q_values(ma_obs_to_track)
                 sa_q_values = self.agent_policies[0].get_q_values(sa_obs_to_track)
-                print("Q-values: ")
-                print(
-                    "Impact measure net close left, action left: "
-                    + str(float(ma_q_values[0, 0]))
-                )
-                print(
-                    "Impact measure net center, action left: "
-                    + str(float(ma_q_values[1, 0]))
-                )
+             
 
-                print(
-                    "Policy net close left, action left: "
-                    + str(float(sa_q_values[0, 0]))
-                )
-                print(
-                    "Policy net center, action left: " + str(float(sa_q_values[1, 0]))
-                )
+               # print(
+               #     sa_q_values[0]
+               # )
+               

@@ -9,8 +9,8 @@ tau: 0.8
 
 impact_batch_size: 256
 impact_update_rate: 32
-tim_initial_step_size: 0.05
-tim_step_size_decay: 0.9999
+tim_initial_step_size: 0.1
+tim_step_size_decay: 0.99999
 sim_learning_rate: 0.0005
-hidden_layer_size: 32
+hidden_layer_size: 64
 
