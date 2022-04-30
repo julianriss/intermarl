@@ -25,7 +25,7 @@ def enricht_config_by_env_specifications(config: Dict):
         )
 
         config["rl_env"]["sa_observation_spaces"] = [
-            Box(0.0, 300.0, (1,), float32)
+            Box(0.0, 300.0, (2,), float32)
             for i in range(config["rl_env"]["num_agents"])
         ]
         config["rl_env"]["sa_action_spaces"] = [

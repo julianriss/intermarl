@@ -6,12 +6,13 @@ from pettingzoo.utils import wrappers
 def init_custom_prison_env(**kwargs):
     env = PrisonAddObs(**kwargs)
 
-    if env.continuous:
-        env = wrappers.ClipOutOfBoundsWrapper(env)
-    else:
-        env = wrappers.AssertOutOfBoundsWrapper(env)
+    #if env.continuous:
+    #    env = wrappers.ClipOutOfBoundsWrapper(env)
+    #else:
+    #    env = wrappers.AssertOutOfBoundsWrapper(env)
 
-    env = wrappers.OrderEnforcingWrapper(env)
+    #env = wrappers.OrderEnforcingWrapper(env)
+  
     return env
 
 
@@ -38,14 +39,24 @@ class PrisonAddObs(raw_env):
         self.reached_left_side = self._init_reached_left_side()
 
     def _init_reached_left_side(self) -> np.ndarray:
-        return np.array([0.0 for _ in range(self.num_agents)])
+        return np.array([0.0, 0.0, 0.0, 0.0])
 
     def reset(self):
         self.reached_left_side = self._init_reached_left_side()
         return super().reset()
+    
 
-    def last(self):
+    def last(self, agent_id):
         obs, reward, done, info = super().last()
+        
+        if(obs == 0.0):
+            self.reached_left_side[agent_id] = 1.0
+        if(obs == 300.0):
+            #print("wll right")
+            self.reached_left_side[agent_id] = 0.0
+
+
+        #print(self.reached_left_side)
         # TODO: adapt obs:
         """ 
        1. last() is called after every step, so you can assume that it is coherent in time
@@ -56,4 +67,5 @@ class PrisonAddObs(raw_env):
        6. adapt the dimensions in the env_utils (so in the config)
        7. see if everything runs through
        """
+        obs = np.array([float(obs), self.reached_left_side[agent_id]])
         return obs, reward, done, info

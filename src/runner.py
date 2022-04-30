@@ -128,12 +128,13 @@ class Runner(object):
 
     def run(self):
         self.env.reset()
+      
         for i in range(self.total_num_simulations):
             #if i % 2_000 == 0:
                 #print("On step: " + str(i))
             done_list = []
             for agent_id in range(self.num_agents):
-                obs, _, done, _ = self.env.last()
+                obs, _, done, _ = self.env.last(agent_id = agent_id)
                 done_list.append(done)
                 action_for_env, action_for_buffer = self._get_action_from_policy(
                     obs, done, agent_id
@@ -141,24 +142,24 @@ class Runner(object):
                 self.env.step(action_for_env)
                 if len(done_list) == self.num_agents and all(done_list):
                     self.env.reset()
-                new_obs, new_reward, _, new_info = self.env.last()
+                new_obs, new_reward, _, new_info = self.env.last(agent_id = agent_id)
                 self._store_transition_data(
                     new_obs, action_for_buffer, new_reward, done, new_info, agent_id
                 )
                 self.reward += self.step_info_dict[agent_id]["rewards"][0]
                 #print(self.reward)
             self._update_policies()
-            self._train_critics_of_impact_measurers()
-            if (
-                self.impact_data_batch_size
-                % self.config["impact_measurement"]["impact_batch_size"]
-                == 0
-                and self.impact_data_batch_size > 0
-            ):
-                self._update_impact_measures()
+            #self._train_critics_of_impact_measurers()
+            #if (
+            #    self.impact_data_batch_size
+            #    % self.config["impact_measurement"]["impact_batch_size"]
+            #    == 0
+            #    and self.impact_data_batch_size > 0
+            #):
+            #    self._update_impact_measures()
 
             ## Maybe some logging from this point onward ##
-            if i % 500 == 0 and i > 0:
+            if i % 10000 == 0 and i > 0:
                 print("Step: ", i)
                 ar = self.reward / 4
                 print("Average reward last rollout: " + str(ar))
@@ -169,14 +170,31 @@ class Runner(object):
             import torch
 
             if i % 2_000 == 0:
-                ma_obs_to_track = torch.tensor(
-                    [[10.0, 10.0, 10.0, 10.0], [150.0, 10.0, 10.0, 150.0]]
-                )
-                sa_obs_to_track = torch.tensor([[290.0], [150.0]])
-                ma_q_values = self.impact_measurers[3].get_q_values(ma_obs_to_track)
-                sa_q_values = self.agent_policies[0].get_q_values(sa_obs_to_track)
-             
+            #    ma_obs_to_track = torch.tensor(
+            #        [[10.0, 10.0, 10.0, 10.0]]
+            #    )
 
+            #    sa_obs_to_track = torch.tensor(
+            #        [[10.0]]
+            #    )
+
+                sa_obs_to_track = torch.tensor([[10.0, 0]])
+                #ma_q_values = self.impact_measurers[0].get_q_values(ma_obs_to_track)
+                #sa_q_values = self.agent_policies[0].get_q_values(sa_obs_to_track)
+                #q_ma = self.impact_measurers[0].get_q_values(ma_obs_to_track)[0]
+                q_sa = self.agent_policies[0].get_q_values(sa_obs_to_track)[0]
+                #print(q_ma, q_sa)
+                #wandb.log({"ma0": q_ma[0]}, step=i)
+                #wandb.log({"ma1": q_ma[1]}, step=i)
+                #wandb.log({"ma2": q_ma[2]}, step=i)
+                #wandb.log({"ma3": q_ma[3]}, step=i)
+
+                wandb.log({"sa0": q_sa[0]}, step=i)
+                wandb.log({"sa1": q_sa[1]}, step=i)
+                wandb.log({"sa2": q_sa[2]}, step=i)
+
+
+                
                # print(
                #     sa_q_values[0]
                # )
