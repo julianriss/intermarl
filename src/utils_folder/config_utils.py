@@ -10,7 +10,10 @@ def enrich_config_file(config: Dict):
 
 
 def enricht_config_by_env_specifications(config: Dict):
-    if config["rl_env"]["name"] == "prison_v3":
+    if (
+        config["rl_env"]["name"] == "prison_v3"
+        or config["rl_env"]["name"] == "custom_prison"
+    ):
         config["rl_env"]["action_space_sizes"] = tuple(
             [3 for k in range(config["rl_env"]["num_agents"])]
         )

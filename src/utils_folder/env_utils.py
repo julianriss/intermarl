@@ -2,7 +2,10 @@ from typing import Dict, Tuple
 
 import gym
 from gym import spaces
-from pettingzoo.butterfly import  prison_v3
+from pettingzoo.butterfly import prison_v4
+
+from src.custom_envs.prison_add_obs import init_custom_prison_env
+
 
 def get_simulation_env(config: Dict):
     rl_config = config["rl_env"]
@@ -10,7 +13,20 @@ def get_simulation_env(config: Dict):
         assert (
             rl_config["num_agents"] % 2 == 0
         ), "Prison can only have an even number of agents!"
-        return prison_v3.env(
+        return prison_v4.env(
+            vector_observation=True,
+            continuous=False,
+            synchronized_start=False,
+            identical_aliens=False,
+            max_cycles=150,
+            num_floors=int(rl_config["num_agents"] / 2),
+            random_aliens=False,
+        )
+    elif rl_config["name"] == "custom_prison":
+        assert (
+            rl_config["num_agents"] % 2 == 0
+        ), "Prison can only have an even number of agents!"
+        return init_custom_prison_env(
             vector_observation=True,
             continuous=False,
             synchronized_start=False,
@@ -53,7 +69,7 @@ class DummyEnvForSpaces(gym.Env):
 def get_env_single_agent_impact_action_and_observation_spaces(
     env_type: str, agent_id: int, info_dict: Dict = None
 ) -> Tuple[spaces.Space]:
-    if env_type == "prison_v3":
+    if env_type == "prison_v3" or env_type == "custom_prison":
         action_space = get_prison_v3_im_action_space(info_dict)
         observation_space = get_prison_v3_im_observation_space(info_dict)
         return action_space, observation_space
